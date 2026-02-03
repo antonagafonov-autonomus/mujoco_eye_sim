@@ -20,9 +20,12 @@
     <mesh name="inner_eyelid" file="Inner_Eyelid_L.obj"/>
     <mesh name="tear_duct" file="TearDuct_L.obj"/>
     <mesh name="cloth" file="Cloth_L.obj"/>
-    
+    <mesh name="face" file="Face_L.obj"/>
+
     <!-- Texture for lens (your UV map) -->
     <texture name="lens_texture" type="2d" file="lens_uv_map.png"/>
+    <texture name="face_texture" type="2d" file="Eye-Face_Medium02.png"/>
+    <texture name="cloth_texture" type="2d" file="Cloth_Color.png"/>
     
     <!-- Materials -->
     <material name="lens_mat" texture="lens_texture" specular="0.5" shininess="0.8"/>
@@ -30,7 +33,8 @@
     <material name="eye_mat" rgba="0.1 0.3 0.5 1.0"/>
     <material name="eyelid_mat" rgba="0.95 0.8 0.75 1.0"/>
     <material name="wet_mat" rgba="1.0 1.0 1.0 0.1" specular="1.0" shininess="1.0"/>
-    <material name="cloth_mat" rgba="0.95 0.85 0.80 1.0"/>
+    <material name="cloth_mat" texture="cloth_texture" specular="0.3" shininess="0.3"/>
+    <material name="face_mat" texture="face_texture" specular="0.3" shininess="0.3"/>
   </asset>
   
   <worldbody>
@@ -80,9 +84,13 @@
             material="eyelid_mat" contype="0" conaffinity="0" group="1"/>
       
       <!-- Cloth/skin -->
-      <geom name="cloth_geom" type="mesh" mesh="cloth" 
+      <geom name="cloth_geom" type="mesh" mesh="cloth"
             material="cloth_mat" contype="0" conaffinity="0" group="1"/>
-      
+
+      <!-- Face -->
+      <geom name="face_geom" type="mesh" mesh="face"
+            material="face_mat" contype="0" conaffinity="0" group="1"/>
+
       <!-- Camera positioned above the eye looking down -->
       <camera name="top_view" pos="0.03 -0.1 0.175" euler="90 0 0" fovy="45"/>
       <camera name="angle_view" pos="0.2 0.0 0.2" euler="0 90 90" fovy="45"/>
