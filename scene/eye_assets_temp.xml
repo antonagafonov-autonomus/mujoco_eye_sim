@@ -1,0 +1,37 @@
+<mujoco>
+  <!-- Shared assets for eye scene -->
+  <asset>
+    <!-- Load eye component meshes -->
+    <mesh name="cornea" file="Cornea_L.obj"/>
+    <mesh name="eye_interior" file="EyeInterior_L.obj"/>
+    <mesh name="eye" file="Eye_L.obj"/>
+    <mesh name="eye_wet" file="EyeWet_L.obj"/>
+    <mesh name="lens" file="Lens_L_extracted.obj"/>
+    <mesh name="inner_eyelid" file="Inner_Eyelid_L.obj"/>
+    <mesh name="tear_duct" file="TearDuct_L.obj"/>
+    <mesh name="cloth" file="Cloth_L.obj"/>
+    <mesh name="face" file="Face_L.obj"/>
+
+    <!-- Load surgical tool -->
+    <mesh name="diathermic_tip" file="tools/diathermic_tip.obj" scale="0.001 0.001 0.001"/>
+
+    <!-- Textures -->
+    <texture name="lens_texture" type="2d" file="lens_uv_map_temp.png"/>
+    <texture name="eye_texture" type="2d" file="INNER_EYE_1_Base_color.png"/>
+    <texture name="face_texture" type="2d" file="Eye-Face_Medium02.png"/>
+    <texture name="cloth_texture" type="2d" file="Cloth_Color.png"/>
+
+    <!-- Materials -->
+    <material name="lens_mat" texture="lens_texture" specular="0.5" shininess="0.8"/>
+    <material name="eye_mat" texture="eye_texture" specular="0.3" shininess="0.5"/>
+    <material name="cornea_mat" rgba="0.9 0.95 1.0 0.3" specular="1.0" shininess="1.0"/>
+    <material name="eyelid_mat" rgba="0.95 0.8 0.75 1.0"/>
+    <material name="wet_mat" rgba="1.0 1.0 1.0 0.1" specular="1.0" shininess="1.0"/>
+    <!-- Cloth material: roughness ~0.65 (from Cloth_defaultMat_Roughness.png) -> low shininess
+         metallic ~0 (from Cloth_defaultMat_Metallic.png) -> low reflectance
+         Note: MuJoCo doesn't support normal maps (Cloth_defaultMat_Normal.png) -->
+    <material name="cloth_mat" texture="cloth_texture" specular="0.2" shininess="0.35" reflectance="0.0"/>
+    <material name="face_mat" texture="face_texture" specular="0.3" shininess="0.3"/>
+    <material name="tool_mat" rgba="0.7 0.7 0.8 1.0" specular="0.8" shininess="0.9"/>
+  </asset>
+</mujoco>

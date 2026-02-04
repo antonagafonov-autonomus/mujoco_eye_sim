@@ -1,0 +1,11 @@
+<mujoco>
+  <!-- Coordinate axes visualization -->
+  <worldbody>
+    <geom name="x_axis" type="cylinder" size="0.003 0.15" pos="0.15 0 0.001"
+          euler="0 90 0" rgba="1 0 0 1" contype="0" conaffinity="0"/>
+    <geom name="y_axis" type="cylinder" size="0.003 0.15" pos="0 0.15 0.001"
+          euler="90 0 0" rgba="0 1 0 1" contype="0" conaffinity="0"/>
+    <geom name="z_axis" type="cylinder" size="0.003 0.15" pos="0 0 0.15"
+          euler="0 0 0" rgba="0 0 1 1" contype="0" conaffinity="0"/>
+  </worldbody>
+</mujoco>

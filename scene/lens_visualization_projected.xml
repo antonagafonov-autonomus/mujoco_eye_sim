@@ -1,0 +1,311 @@
+<mujoco>
+  <worldbody>
+    <!-- LENS VISUALIZATION - PROJECTED TRAJECTORY ONLY -->
+    <!-- Lens geometric center -->
+    <body name="lens_center_marker" pos="0.030893 -0.007080 0.270276">
+      <geom name="lens_center_sphere" type="sphere" size="0.0002" rgba="0 1 0 0.8" contype="0" conaffinity="0"/>
+    </body>
+
+    <!-- Projected trajectory points (100 points) -->
+    <body name="trajectory_point_0" pos="0.030900 -0.007950 0.273375">
+      <geom name="traj_marker_0" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_1" pos="0.031175 -0.007950 0.273350">
+      <geom name="traj_marker_1" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_2" pos="0.031175 -0.007950 0.273350">
+      <geom name="traj_marker_2" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_3" pos="0.031525 -0.007950 0.273325">
+      <geom name="traj_marker_3" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_4" pos="0.031775 -0.007950 0.273250">
+      <geom name="traj_marker_4" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_5" pos="0.031775 -0.007950 0.273250">
+      <geom name="traj_marker_5" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_6" pos="0.032100 -0.007950 0.273150">
+      <geom name="traj_marker_6" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_7" pos="0.032325 -0.007950 0.273025">
+      <geom name="traj_marker_7" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_8" pos="0.032325 -0.007950 0.273025">
+      <geom name="traj_marker_8" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_9" pos="0.032625 -0.007950 0.272875">
+      <geom name="traj_marker_9" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_10" pos="0.032850 -0.007950 0.272700">
+      <geom name="traj_marker_10" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_11" pos="0.032850 -0.007950 0.272700">
+      <geom name="traj_marker_11" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_12" pos="0.033100 -0.007950 0.272475">
+      <geom name="traj_marker_12" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_13" pos="0.033250 -0.007950 0.272275">
+      <geom name="traj_marker_13" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_14" pos="0.033250 -0.007950 0.272275">
+      <geom name="traj_marker_14" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_15" pos="0.033475 -0.007950 0.272000">
+      <geom name="traj_marker_15" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_16" pos="0.033475 -0.007950 0.272000">
+      <geom name="traj_marker_16" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_17" pos="0.033625 -0.007950 0.271775">
+      <geom name="traj_marker_17" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_18" pos="0.033775 -0.007950 0.271475">
+      <geom name="traj_marker_18" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_19" pos="0.033775 -0.007950 0.271475">
+      <geom name="traj_marker_19" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_20" pos="0.033850 -0.007950 0.271200">
+      <geom name="traj_marker_20" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_21" pos="0.033950 -0.007950 0.270875">
+      <geom name="traj_marker_21" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_22" pos="0.033950 -0.007950 0.270875">
+      <geom name="traj_marker_22" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_23" pos="0.033975 -0.007950 0.270625">
+      <geom name="traj_marker_23" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_24" pos="0.034025 -0.007950 0.270300">
+      <geom name="traj_marker_24" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_25" pos="0.034025 -0.007950 0.270300">
+      <geom name="traj_marker_25" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_26" pos="0.034000 -0.007950 0.270025">
+      <geom name="traj_marker_26" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_27" pos="0.033950 -0.007950 0.269675">
+      <geom name="traj_marker_27" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_28" pos="0.033950 -0.007950 0.269675">
+      <geom name="traj_marker_28" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_29" pos="0.033875 -0.007950 0.269425">
+      <geom name="traj_marker_29" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_30" pos="0.033875 -0.007950 0.269425">
+      <geom name="traj_marker_30" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_31" pos="0.033775 -0.007950 0.269100">
+      <geom name="traj_marker_31" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_32" pos="0.033625 -0.007950 0.268850">
+      <geom name="traj_marker_32" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_33" pos="0.033625 -0.007950 0.268850">
+      <geom name="traj_marker_33" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_34" pos="0.033475 -0.007950 0.268550">
+      <geom name="traj_marker_34" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_35" pos="0.033325 -0.007950 0.268350">
+      <geom name="traj_marker_35" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_36" pos="0.033325 -0.007950 0.268350">
+      <geom name="traj_marker_36" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_37" pos="0.033100 -0.007950 0.268075">
+      <geom name="traj_marker_37" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_38" pos="0.033100 -0.007950 0.268075">
+      <geom name="traj_marker_38" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_39" pos="0.032875 -0.007950 0.267900">
+      <geom name="traj_marker_39" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_40" pos="0.032625 -0.007950 0.267700">
+      <geom name="traj_marker_40" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_41" pos="0.032625 -0.007950 0.267700">
+      <geom name="traj_marker_41" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_42" pos="0.032400 -0.007950 0.267575">
+      <geom name="traj_marker_42" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_43" pos="0.032100 -0.007950 0.267400">
+      <geom name="traj_marker_43" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_44" pos="0.032100 -0.007950 0.267400">
+      <geom name="traj_marker_44" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_45" pos="0.031850 -0.007950 0.267325">
+      <geom name="traj_marker_45" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_46" pos="0.031525 -0.007950 0.267225">
+      <geom name="traj_marker_46" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_47" pos="0.031525 -0.007950 0.267225">
+      <geom name="traj_marker_47" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_48" pos="0.031250 -0.007850 0.266825">
+      <geom name="traj_marker_48" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_49" pos="0.031250 -0.007850 0.266825">
+      <geom name="traj_marker_49" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_50" pos="0.030900 -0.007850 0.266800">
+      <geom name="traj_marker_50" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_51" pos="0.030550 -0.007850 0.266825">
+      <geom name="traj_marker_51" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_52" pos="0.030550 -0.007850 0.266825">
+      <geom name="traj_marker_52" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_53" pos="0.030275 -0.007950 0.267225">
+      <geom name="traj_marker_53" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_54" pos="0.030025 -0.007950 0.267300">
+      <geom name="traj_marker_54" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_55" pos="0.029875 -0.007850 0.266950">
+      <geom name="traj_marker_55" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_56" pos="0.029700 -0.007950 0.267400">
+      <geom name="traj_marker_56" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_57" pos="0.029250 -0.007850 0.267225">
+      <geom name="traj_marker_57" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_58" pos="0.029250 -0.007850 0.267225">
+      <geom name="traj_marker_58" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_59" pos="0.028950 -0.007850 0.267400">
+      <geom name="traj_marker_59" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_60" pos="0.028700 -0.007850 0.267600">
+      <geom name="traj_marker_60" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_61" pos="0.028700 -0.007850 0.267600">
+      <geom name="traj_marker_61" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_62" pos="0.028450 -0.007850 0.267800">
+      <geom name="traj_marker_62" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_63" pos="0.028225 -0.007850 0.268075">
+      <geom name="traj_marker_63" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_64" pos="0.028225 -0.007850 0.268075">
+      <geom name="traj_marker_64" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_65" pos="0.028000 -0.007850 0.268350">
+      <geom name="traj_marker_65" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_66" pos="0.028000 -0.007850 0.268350">
+      <geom name="traj_marker_66" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_67" pos="0.027850 -0.007850 0.268650">
+      <geom name="traj_marker_67" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_68" pos="0.027700 -0.007850 0.268950">
+      <geom name="traj_marker_68" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_69" pos="0.027700 -0.007850 0.268950">
+      <geom name="traj_marker_69" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_70" pos="0.027600 -0.007850 0.269275">
+      <geom name="traj_marker_70" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_71" pos="0.027600 -0.007850 0.269275">
+      <geom name="traj_marker_71" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_72" pos="0.027500 -0.007850 0.269600">
+      <geom name="traj_marker_72" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_73" pos="0.027450 -0.007850 0.269950">
+      <geom name="traj_marker_73" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_74" pos="0.027450 -0.007850 0.269950">
+      <geom name="traj_marker_74" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_75" pos="0.027775 -0.007950 0.270300">
+      <geom name="traj_marker_75" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_76" pos="0.027450 -0.007850 0.270625">
+      <geom name="traj_marker_76" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_77" pos="0.027450 -0.007850 0.270625">
+      <geom name="traj_marker_77" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_78" pos="0.027500 -0.007850 0.270950">
+      <geom name="traj_marker_78" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_79" pos="0.027600 -0.007850 0.271275">
+      <geom name="traj_marker_79" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_80" pos="0.027600 -0.007850 0.271275">
+      <geom name="traj_marker_80" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_81" pos="0.028025 -0.007950 0.271475">
+      <geom name="traj_marker_81" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_82" pos="0.028150 -0.007950 0.271700">
+      <geom name="traj_marker_82" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_83" pos="0.028150 -0.007950 0.271700">
+      <geom name="traj_marker_83" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_84" pos="0.028300 -0.007950 0.272000">
+      <geom name="traj_marker_84" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_85" pos="0.028475 -0.007950 0.272200">
+      <geom name="traj_marker_85" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_86" pos="0.028475 -0.007950 0.272200">
+      <geom name="traj_marker_86" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_87" pos="0.028700 -0.007950 0.272475">
+      <geom name="traj_marker_87" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_88" pos="0.028700 -0.007950 0.272475">
+      <geom name="traj_marker_88" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_89" pos="0.028925 -0.007950 0.272650">
+      <geom name="traj_marker_89" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_90" pos="0.029175 -0.007950 0.272875">
+      <geom name="traj_marker_90" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_91" pos="0.029175 -0.007950 0.272875">
+      <geom name="traj_marker_91" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_92" pos="0.029400 -0.007950 0.273000">
+      <geom name="traj_marker_92" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_93" pos="0.029700 -0.007950 0.273150">
+      <geom name="traj_marker_93" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_94" pos="0.029700 -0.007950 0.273150">
+      <geom name="traj_marker_94" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_95" pos="0.029950 -0.007950 0.273225">
+      <geom name="traj_marker_95" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_96" pos="0.030275 -0.007950 0.273325">
+      <geom name="traj_marker_96" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_97" pos="0.030275 -0.007950 0.273325">
+      <geom name="traj_marker_97" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_98" pos="0.030550 -0.007950 0.273350">
+      <geom name="traj_marker_98" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+    <body name="trajectory_point_99" pos="0.030550 -0.007950 0.273350">
+      <geom name="traj_marker_99" type="sphere" size="0.0001" rgba="1 0 1 0.8" contype="0" conaffinity="0"/>
+    </body>
+  </worldbody>
+</mujoco>

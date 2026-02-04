@@ -1,0 +1,12 @@
+<mujoco>
+  <!-- Eye body assembly - includes all eye components -->
+
+  <!-- Eye anatomical geometry (lens, cornea, etc.) -->
+  <include file="eye_anatomy.xml"/>
+
+  <!-- Cameras for visualization -->
+  <include file="eye_cameras.xml"/>
+
+  <!-- Surgical tool -->
+  <include file="eye_tool.xml"/>
+</mujoco>

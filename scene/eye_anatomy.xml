@@ -1,0 +1,42 @@
+<mujoco>
+  <!-- Eye anatomical components -->
+  <worldbody>
+    <body name="eye_assembly" pos="0 0 0.1">
+      <!-- Lens with UV map -->
+      <geom name="lens_geom" type="mesh" mesh="lens"
+            material="lens_mat" contype="0" conaffinity="0" group="0"/>
+
+      <!-- Eye interior (base) -->
+      <geom name="eye_interior_geom" type="mesh" mesh="eye_interior"
+            material="eye_mat" contype="0" conaffinity="0" group="1"/>
+
+      <!-- Main eye -->
+      <geom name="eye_geom" type="mesh" mesh="eye"
+            material="eye_mat" contype="0" conaffinity="0" group="1"/>
+
+      <!-- Cornea (transparent) -->
+      <geom name="cornea_geom" type="mesh" mesh="cornea"
+            material="cornea_mat" contype="0" conaffinity="0" group="1"/>
+
+      <!-- Wet layer (glossy effect) -->
+      <geom name="eye_wet_geom" type="mesh" mesh="eye_wet"
+            material="wet_mat" contype="0" conaffinity="0" group="1"/>
+
+      <!-- Inner eyelid -->
+      <geom name="inner_eyelid_geom" type="mesh" mesh="inner_eyelid"
+            material="eyelid_mat" contype="0" conaffinity="0" group="1"/>
+
+      <!-- Tear duct -->
+      <geom name="tear_duct_geom" type="mesh" mesh="tear_duct"
+            material="eyelid_mat" contype="0" conaffinity="0" group="1"/>
+
+      <!-- Cloth/skin -->
+      <geom name="cloth_geom" type="mesh" mesh="cloth"
+            material="cloth_mat" contype="0" conaffinity="0" group="1"/>
+
+      <!-- Face -->
+      <geom name="face_geom" type="mesh" mesh="face"
+            material="face_mat" contype="0" conaffinity="0" group="1"/>
+    </body>
+  </worldbody>
+</mujoco>

@@ -1,0 +1,16 @@
+<mujoco>
+  <!-- Surgical tool (diathermic tip) -->
+  <worldbody>
+    <body name="diathermic_tip" pos="0.04 -0.015 0.27" euler="0 0 45" mocap="true">
+      <!-- Visual geometry -->
+      <geom name="tool_geom" type="mesh" mesh="diathermic_tip"
+            material="tool_mat" contype="0" conaffinity="0"/>
+
+      <!-- Tool tip marker (red sphere) -->
+      <site name="tool_tip" pos="0 0.01 0.0025" size="0.0005" rgba="1 0 0 1"/>
+
+      <!-- On-tool camera (end effector view) -->
+      <camera name="tool_view" pos="0 -0.02 0.015" euler="90 0 0" fovy="25"/>
+    </body>
+  </worldbody>
+</mujoco>

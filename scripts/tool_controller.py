@@ -1,0 +1,396 @@
+#!/usr/bin/env python3
+"""
+Tool Controller: Moves tool along projected trajectory in MuJoCo
+Uses pre-computed projected trajectory from trajectory_generator.py
+Captures images from both cameras and logs tool positions
+Optionally paints trajectory on lens UV texture
+Supports multiple iterations with randomized ellipsoid trajectories
+"""
+
+import mujoco
+import sys
+import argparse
+import json
+import numpy as np
+from pathlib import Path
+from datetime import datetime
+from PIL import Image
+
+from utils import (
+    load_trajectory_file,
+    run_with_capture,
+    move_tool_along_trajectory,
+    TexturePainter,
+    generate_ellipsoid_trajectory,
+    generate_random_trajectory_params,
+    load_obj_with_uv
+)
+
+from analyze_lens import (
+    analyze_lens_geometry,
+    transform_to_world_coordinates,
+    project_trajectory_to_mesh
+)
+
+
+def reset_texture(texture_path, color=(128, 128, 128), size=(512, 512)):
+    """Reset texture to a solid color"""
+    img = Image.new('RGB', size, color)
+    img.save(texture_path)
+
+
+def get_camera_params_from_model(model, camera_names):
+    """
+    Extract camera parameters from loaded MuJoCo model
+
+    Args:
+        model: MuJoCo model
+        camera_names: List of camera names to extract
+
+    Returns:
+        Dict with camera parameters
+    """
+    cameras = {}
+    for name in camera_names:
+        cam_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_CAMERA, name)
+        if cam_id >= 0:
+            pos = model.cam_pos[cam_id].tolist()
+            quat = model.cam_quat[cam_id].tolist()
+            fovy = float(model.cam_fovy[cam_id])
+            cameras[name] = {
+                'pos': pos,
+                'quat': quat,
+                'fovy': fovy
+            }
+    return cameras
+
+
+def create_temp_scene(scene_path, temp_texture_name='lens_uv_map_temp.png'):
+    """
+    Create a temporary scene with modified assets to use temp texture.
+    """
+    scene_dir = Path(scene_path).parent
+
+    # Read original assets file
+    assets_path = scene_dir / 'eye_assets.xml'
+    with open(assets_path, 'r') as f:
+        assets_content = f.read()
+
+    # Replace lens texture with temp texture
+    modified_content = assets_content.replace(
+        'file="lens_uv_map.png"',
+        f'file="{temp_texture_name}"'
+    )
+
+    # Write to temp assets file
+    temp_assets_path = scene_dir / 'eye_assets_temp.xml'
+    with open(temp_assets_path, 'w') as f:
+        f.write(modified_content)
+
+    # Read original scene file
+    with open(scene_path, 'r') as f:
+        scene_content = f.read()
+
+    # Replace assets include with temp assets
+    modified_scene = scene_content.replace(
+        'file="eye_assets.xml"',
+        'file="eye_assets_temp.xml"'
+    )
+
+    # Write to temp scene file
+    temp_scene_path = scene_dir / 'eye_scene_temp.xml'
+    with open(temp_scene_path, 'w') as f:
+        f.write(modified_scene)
+
+    return str(temp_scene_path)
+
+
+def save_trajectory(trajectory_local, trajectory_world, params,
+                    projected_local, projected_world, output_path):
+    """Save trajectory to JSON file"""
+    data = {
+        'metadata': {
+            'timestamp': datetime.now().isoformat(),
+            'num_points': len(trajectory_local),
+            'parameters': params,
+            'has_projected': True
+        },
+        'trajectory_local': trajectory_local.tolist(),
+        'trajectory_world': trajectory_world.tolist(),
+        'projected_local': projected_local.tolist(),
+        'projected_world': projected_world.tolist()
+    }
+
+    filepath = output_path / 'trajectory.json'
+    with open(filepath, 'w') as f:
+        json.dump(data, f, indent=2)
+
+    return str(filepath)
+
+
+def run_iteration(iteration_idx, args, lens_geometry, scene_path, base_output_dir):
+    """
+    Run a single iteration with a randomized trajectory
+
+    Args:
+        iteration_idx: Current iteration number
+        args: Parsed command line arguments
+        lens_geometry: Lens geometry from analyze_lens_geometry()
+        scene_path: Path to scene XML (temp scene if painting)
+        base_output_dir: Base output directory
+
+    Returns:
+        Path to iteration output directory
+    """
+    print(f"\n{'='*60}")
+    print(f"ITERATION {iteration_idx + 1}/{args.iterations}")
+    print(f"{'='*60}")
+
+    # Generate randomized trajectory parameters
+    traj_params = generate_random_trajectory_params(
+        base_radius_x=args.radius_x,
+        base_radius_y=args.radius_y,
+        radius_std=args.radius_std,
+        center_std=args.center_std
+    )
+
+    print(f"\nTrajectory parameters:")
+    print(f"  Radius X: {traj_params['radius_x']*1000:.2f} mm")
+    print(f"  Radius Y: {traj_params['radius_y']*1000:.2f} mm")
+    print(f"  Center offset: ({traj_params['center_offset_x']*1000:.2f}, {traj_params['center_offset_y']*1000:.2f}) mm")
+    print(f"  Rotation: {np.degrees(traj_params['rotation_angle']):.1f} deg")
+    print(f"  Noise std: {traj_params['noise_std']*1000:.3f} mm")
+
+    # Generate ellipsoid trajectory
+    trajectory_local = generate_ellipsoid_trajectory(
+        lens_geometry,
+        radius_x=traj_params['radius_x'],
+        radius_y=traj_params['radius_y'],
+        num_points=args.num_points,
+        offset_meters=args.offset,
+        center_offset_x=traj_params['center_offset_x'],
+        center_offset_y=traj_params['center_offset_y'],
+        rotation_angle=traj_params['rotation_angle'],
+        noise_std=traj_params['noise_std']
+    )
+
+    # Transform to world coordinates
+    trajectory_world = transform_to_world_coordinates(trajectory_local, args.eye_pos)
+
+    # Project to mesh surface
+    print("\nProjecting trajectory to lens surface...")
+    projected_local = project_trajectory_to_mesh(trajectory_local, lens_geometry)
+    projected_world = transform_to_world_coordinates(projected_local, args.eye_pos)
+
+    print(f"✓ Generated trajectory: {len(projected_world)} points")
+
+    # Create iteration output directory
+    iter_output_dir = base_output_dir / f"iter_{iteration_idx:04d}"
+    iter_output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save trajectory
+    save_trajectory(
+        trajectory_local, trajectory_world,
+        traj_params,
+        projected_local, projected_world,
+        iter_output_dir
+    )
+    print(f"✓ Trajectory saved to: {iter_output_dir / 'trajectory.json'}")
+
+    # Reset texture
+    if args.paint:
+        print("\nResetting texture...")
+        reset_texture(args.texture)
+
+    # Initialize painter
+    painter = None
+    if args.paint:
+        painter = TexturePainter(
+            texture_path=args.texture,
+            mesh_path=args.mesh,
+            eye_assembly_pos=args.eye_pos
+        )
+
+    # Load model
+    model = mujoco.MjModel.from_xml_path(scene_path)
+    data = mujoco.MjData(model)
+    mujoco.mj_forward(model, data)
+
+    # Run capture
+    run_with_capture(
+        model, data, projected_world, iter_output_dir,
+        width=args.width, height=args.height,
+        painter=painter, paint_radius=args.paint_radius,
+        scene_path=scene_path
+    )
+
+    return iter_output_dir
+
+
+def main():
+    """Main execution"""
+    parser = argparse.ArgumentParser(
+        description='Tool trajectory controller with multi-iteration support',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    # Mode selection
+    parser.add_argument('trajectory_file', type=str, nargs='?', default=None,
+                        help='Path to trajectory JSON file (for single run mode)')
+    parser.add_argument('--iterations', '-i', type=int, default=1,
+                        help='Number of iterations (generates new trajectory each time)')
+
+    # Trajectory generation parameters
+    parser.add_argument('--radius-x', type=float, default=0.003,
+                        help='Base semi-major axis in meters')
+    parser.add_argument('--radius-y', type=float, default=0.002,
+                        help='Base semi-minor axis in meters')
+    parser.add_argument('--radius-std', type=float, default=0.0002,
+                        help='Std dev for radius randomization')
+    parser.add_argument('--center-std', type=float, default=0.0003,
+                        help='Std dev for center offset randomization')
+    parser.add_argument('--num-points', '-n', type=int, default=100,
+                        help='Number of points in trajectory')
+    parser.add_argument('--offset', type=float, default=0.0,
+                        help='Offset along normal in meters')
+
+    # Scene and capture
+    parser.add_argument('--speed', '-s', type=float, default=1.0,
+                        help='Animation speed multiplier')
+    parser.add_argument('--scene', type=str, default='../scene/eye_scene.xml',
+                        help='Path to scene XML file')
+    parser.add_argument('--capture', '-c', action='store_true',
+                        help='Capture images from both cameras')
+    parser.add_argument('--output', '-o', type=str, default='../captures',
+                        help='Output directory for captured data')
+    parser.add_argument('--width', type=int, default=640,
+                        help='Capture image width')
+    parser.add_argument('--height', type=int, default=480,
+                        help='Capture image height')
+
+    # Painting options
+    parser.add_argument('--paint', '-p', action='store_true',
+                        help='Paint trajectory on lens texture')
+    parser.add_argument('--paint-radius', type=int, default=3,
+                        help='Radius in pixels for painting')
+    parser.add_argument('--texture', type=str, default='../textures/lens_uv_map.png',
+                        help='Path to lens UV texture')
+    parser.add_argument('--mesh', type=str, default='../meshes/Lens_L_extracted.obj',
+                        help='Path to lens mesh with UVs')
+    parser.add_argument('--eye-pos', type=float, nargs=3, default=[0, 0, 0.1],
+                        metavar=('X', 'Y', 'Z'),
+                        help='Eye assembly position in world coordinates')
+
+    args = parser.parse_args()
+
+    print("\n" + "="*60)
+    print("TOOL TRAJECTORY CONTROLLER")
+    print("="*60)
+
+    # Determine mode: single trajectory file or multi-iteration
+    if args.trajectory_file is not None and args.iterations == 1:
+        # Single trajectory file mode
+        if not Path(args.trajectory_file).exists():
+            print(f"Error: Trajectory file not found: {args.trajectory_file}")
+            sys.exit(1)
+
+        print("\nMode: Single trajectory file")
+        trajectory_world, metadata = load_trajectory_file(args.trajectory_file)
+
+        # Initialize painter if requested
+        painter = None
+        scene_path = args.scene
+
+        if args.paint:
+            print("\nResetting texture to clean state...")
+            reset_texture(args.texture)
+            print("\nInitializing texture painter...")
+            painter = TexturePainter(
+                texture_path=args.texture,
+                mesh_path=args.mesh,
+                eye_assembly_pos=args.eye_pos
+            )
+            if args.capture:
+                print("Creating temp scene for texture updates...")
+                scene_path = create_temp_scene(args.scene)
+
+        print("\nLoading MuJoCo model...")
+        model = mujoco.MjModel.from_xml_path(scene_path)
+        data = mujoco.MjData(model)
+        mujoco.mj_forward(model, data)
+        print("✓ Model loaded")
+
+        if args.capture:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_dir = Path(args.output) / f"capture_{timestamp}"
+            run_with_capture(
+                model, data, trajectory_world, output_dir,
+                width=args.width, height=args.height,
+                painter=painter, paint_radius=args.paint_radius,
+                scene_path=scene_path
+            )
+        else:
+            move_tool_along_trajectory(
+                model, data, trajectory_world,
+                speed=args.speed,
+                painter=painter, paint_radius=args.paint_radius
+            )
+
+    else:
+        # Multi-iteration mode
+        print(f"\nMode: Multi-iteration ({args.iterations} iterations)")
+        print("Generating randomized ellipsoid trajectories")
+
+        # Analyze lens geometry once
+        print("\nAnalyzing lens geometry...")
+        lens_geometry = analyze_lens_geometry(args.mesh)
+
+        # Prepare scene
+        scene_path = args.scene
+        if args.paint and args.capture:
+            print("\nCreating temp scene for texture updates...")
+            scene_path = create_temp_scene(args.scene)
+            print(f"  Temp scene: {scene_path}")
+
+        # Create base output directory
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_output_dir = Path(args.output) / f"run_{timestamp}"
+        base_output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save run configuration
+        config = {
+            'timestamp': timestamp,
+            'iterations': args.iterations,
+            'base_radius_x': args.radius_x,
+            'base_radius_y': args.radius_y,
+            'radius_std': args.radius_std,
+            'center_std': args.center_std,
+            'num_points': args.num_points,
+            'eye_pos': args.eye_pos,
+            'resolution': [args.width, args.height],
+            'paint': args.paint,
+            'paint_radius': args.paint_radius
+        }
+        with open(base_output_dir / 'config.json', 'w') as f:
+            json.dump(config, f, indent=2)
+
+        print(f"\nOutput directory: {base_output_dir}")
+        print(f"Config saved to: {base_output_dir / 'config.json'}")
+
+        # Run iterations
+        for i in range(args.iterations):
+            run_iteration(i, args, lens_geometry, scene_path, base_output_dir)
+
+        print(f"\n{'='*60}")
+        print(f"ALL ITERATIONS COMPLETE")
+        print(f"{'='*60}")
+        print(f"Output: {base_output_dir}")
+        print(f"Iterations: {args.iterations}")
+
+    print("\n" + "="*60)
+    print("COMPLETE")
+    print("="*60 + "\n")
+
+
+if __name__ == "__main__":
+    main()

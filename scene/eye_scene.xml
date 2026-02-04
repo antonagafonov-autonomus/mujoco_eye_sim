@@ -1,0 +1,29 @@
+<mujoco model="Eye Visualization">
+  <compiler angle="degree" meshdir="../meshes" texturedir="../textures"/>
+
+  <!-- Include shared assets -->
+  <include file="eye_assets.xml"/>
+
+  <!-- Include physics parameters -->
+  <include file="eye_physics.xml"/>
+
+  <!-- Include coordinate axes -->
+  <include file="eye_axes.xml"/>
+
+  <visual>
+    <global offwidth="1920" offheight="1080"/>
+    <quality shadowsize="4096"/>
+  </visual>
+
+  <worldbody>
+    <!-- Lighting setup -->
+    <light name="top_light" pos="0 0 5" dir="0 0 -1" diffuse="1 1 1"/>
+    <light name="side_light" pos="1 0 1" dir="-1 0 -0.5" diffuse="0.5 0.5 0.5"/>
+
+    <!-- Ground plane -->
+    <geom type="plane" size="1 1 0.1" rgba="0.2 0.2 0.2 1"/>
+  </worldbody>
+
+  <!-- Include shared eye body -->
+  <include file="eye_body.xml"/>
+</mujoco>
