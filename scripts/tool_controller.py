@@ -357,6 +357,13 @@ def main():
         base_output_dir = Path(args.output) / f"run_{timestamp}"
         base_output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Load model to get camera parameters
+        print("\nLoading model for camera parameters...")
+        temp_model = mujoco.MjModel.from_xml_path(scene_path)
+        camera_params = get_camera_params_from_model(
+            temp_model, ['top_view', 'angle_view', 'tool_view']
+        )
+
         # Save run configuration
         config = {
             'timestamp': timestamp,
@@ -369,7 +376,8 @@ def main():
             'eye_pos': args.eye_pos,
             'resolution': [args.width, args.height],
             'paint': args.paint,
-            'paint_radius': args.paint_radius
+            'paint_radius': args.paint_radius,
+            'cameras': camera_params
         }
         with open(base_output_dir / 'config.json', 'w') as f:
             json.dump(config, f, indent=2)
