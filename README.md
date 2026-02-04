@@ -243,6 +243,9 @@ python3 adjust_camera.py
 python3 adjust_camera.py --camera top_view
 python3 adjust_camera.py -c top_view
 
+# Adjust tool_view camera (on-tool end effector camera)
+python3 adjust_camera.py -c tool_view
+
 # Override initial values
 python3 adjust_camera.py --euler 90 0 70 --fovy 45
 ```
@@ -250,7 +253,7 @@ python3 adjust_camera.py --euler 90 0 70 --fovy 45
 **Options:**
 | Option | Default | Description |
 |--------|---------|-------------|
-| `-c`, `--camera` | angle_view | Camera to adjust (angle_view or top_view) |
+| `-c`, `--camera` | angle_view | Camera to adjust (angle_view, top_view, or tool_view) |
 | `--euler` | from XML | Initial euler angles (X Y Z) |
 | `--fovy` | from XML | Initial field of view |
 | `--scene` | ../scene/eye_scene.xml | Scene file path |
@@ -325,7 +328,7 @@ mujoco_eye_sim/
 │   ├── eye_body.xml            # Body hierarchy
 │   ├── eye_anatomy.xml         # Eye components
 │   ├── eye_cameras.xml         # Camera definitions
-│   ├── eye_tool.xml            # Surgical tool
+│   ├── eye_tool.xml            # Surgical tool + tool_view camera + local axes
 │   └── lens_visualization*.xml # Trajectory markers
 │
 ├── meshes/                     # 3D models (OBJ)
@@ -338,9 +341,10 @@ mujoco_eye_sim/
 │           ├── trajectory.json
 │           ├── positions.json
 │           ├── painted_texture.png
-│           ├── video.mp4
+│           ├── video.mp4            # 2x2 grid video
 │           ├── top_view/
-│           └── angle_view/
+│           ├── angle_view/
+│           └── tool_view/
 ├── utils/
 └── parameters/
 ```
@@ -354,13 +358,35 @@ eye_scene.xml
 ├── eye_axes.xml            # Coordinate axes (optional, can be commented out)
 └── eye_body.xml
     ├── eye_anatomy.xml     # Lens, cornea, eye components
-    ├── eye_cameras.xml     # top_view, angle_view
-    └── eye_tool.xml        # diathermic_tip mocap body
+    ├── eye_cameras.xml     # top_view, angle_view (static cameras)
+    └── eye_tool.xml        # diathermic_tip mocap body + tool_view camera + tool axes
 ```
 
 ## Output Data Format
 
-### trajectory.json
+### config.json (per run)
+```json
+{
+  "timestamp": "20260204_163000",
+  "iterations": 10,
+  "base_radius_x": 0.003,
+  "base_radius_y": 0.002,
+  "radius_std": 0.0002,
+  "center_std": 0.0003,
+  "num_points": 100,
+  "eye_pos": [0, 0, 0.1],
+  "resolution": [640, 480],
+  "paint": true,
+  "paint_radius": 3,
+  "cameras": {
+    "top_view": {"pos": [x, y, z], "quat": [w, x, y, z], "fovy": 45},
+    "angle_view": {"pos": [x, y, z], "quat": [w, x, y, z], "fovy": 45},
+    "tool_view": {"pos": [x, y, z], "quat": [w, x, y, z], "fovy": 15}
+  }
+}
+```
+
+### trajectory.json (per iteration)
 ```json
 {
   "metadata": {
@@ -382,14 +408,14 @@ eye_scene.xml
 }
 ```
 
-### positions.json
+### positions.json (per iteration)
 ```json
 {
   "metadata": {
     "timestamp": "2026-02-04T16:20:00",
     "num_frames": 100,
     "resolution": [640, 480],
-    "cameras": ["top_view", "angle_view"],
+    "cameras": ["top_view", "angle_view", "tool_view"],
     "trajectory_painted": true
   },
   "frames": [

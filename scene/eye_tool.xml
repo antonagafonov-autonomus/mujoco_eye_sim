@@ -10,7 +10,15 @@
       <site name="tool_tip" pos="0 0.01 0.0025" size="0.0005" rgba="1 0 0 1"/>
 
       <!-- On-tool camera (end effector view) -->
-      <camera name="tool_view" pos="0 -0.02 0.015" euler="90 0 0" fovy="25"/>
+      <camera name="tool_view" pos="0 -0.1 0.0" euler="90 0 0" fovy="15"/>
+
+      <!-- Tool local coordinate axes -->
+      <!-- <geom name="tool_x_axis" type="cylinder" size="0.0005 0.01" pos="0.01 0 0"
+            euler="0 90 0" rgba="1 0 0 0.8" contype="0" conaffinity="0"/>
+      <geom name="tool_y_axis" type="cylinder" size="0.0005 0.01" pos="0 0.01 0"
+            euler="90 0 0" rgba="0 1 0 0.8" contype="0" conaffinity="0"/>
+      <geom name="tool_z_axis" type="cylinder" size="0.0005 0.01" pos="0 0 0.01"
+            euler="0 0 0" rgba="0 0 1 0.8" contype="0" conaffinity="0"/> -->
     </body>
   </worldbody>
 </mujoco>

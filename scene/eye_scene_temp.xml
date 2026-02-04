@@ -8,7 +8,7 @@
   <include file="eye_physics.xml"/>
 
   <!-- Include coordinate axes -->
-  <include file="eye_axes.xml"/>
+  <!-- <include file="eye_axes.xml"/> -->
 
   <visual>
     <global offwidth="1920" offheight="1080"/>
