@@ -6,6 +6,7 @@ Utils: Shared utilities for MuJoCo eye simulation
 - Texture reloading during simulation
 """
 
+import random
 import mujoco
 import mujoco.viewer
 import numpy as np
@@ -311,7 +312,12 @@ def generate_random_trajectory_params(base_radius_x=0.003, base_radius_y=0.002,
 class TexturePainter:
     """Handles painting on UV texture and reloading in MuJoCo"""
 
-    def __init__(self, texture_path, mesh_path, eye_assembly_pos, use_temp=True):
+    # Fill mode constants
+    FILL_SOLID = 'solid'
+    FILL_RANDOM = 'random'
+
+    def __init__(self, texture_path, mesh_path, eye_assembly_pos, use_temp=True,
+                 fill_mode='random', random_std=30):
         """
         Initialize texture painter
 
@@ -320,12 +326,18 @@ class TexturePainter:
             mesh_path: Path to lens OBJ file with UV coordinates
             eye_assembly_pos: [x, y, z] position of eye assembly
             use_temp: If True, create a temp texture file for runtime use
+            fill_mode: 'solid' for uniform color, 'random' for normal distribution noise
+            random_std: Standard deviation for random fill (default 30)
         """
         self.texture_path = Path(texture_path)
         self.original_texture = Image.open(texture_path).convert('RGB')
         self.texture = self.original_texture.copy()
         self.texture_array = np.array(self.texture)
         self.width, self.height = self.texture.size
+
+        # Fill mode settings
+        self.fill_mode = fill_mode
+        self.random_std = random_std
 
         # Create temp texture file (used during runtime)
         self.use_temp = use_temp
@@ -346,6 +358,7 @@ class TexturePainter:
         print(f"✓ TexturePainter initialized")
         print(f"  Texture: {self.texture_path} ({self.width}x{self.height})")
         print(f"  Temp texture: {self.temp_texture_path}")
+        print(f"  Fill mode: {fill_mode}" + (f" (std={random_std})" if fill_mode == 'random' else ""))
         print(f"  Mesh vertices: {len(self.mesh_data['vertices'])}")
         print(f"  Mesh UVs: {len(self.mesh_data['uvs']) if self.mesh_data['uvs'] is not None else 0}")
 
@@ -354,14 +367,44 @@ class TexturePainter:
         self.texture = self.original_texture.copy()
         self.texture_array = np.array(self.texture)
 
-    def paint_at_world_pos(self, point_world, radius_pixels=3, color=(0, 0, 0)):
+    def _fill_solid(self, x, y, color):
+        """Fill pixel with solid color"""
+        self.texture_array[y, x] = color
+
+    def _fill_random(self, x, y, color):
+        """Fill pixel with color + normal distribution noise"""
+        noise = np.random.normal(0, self.random_std, 3)
+        noisy_color = np.clip(np.array(color) + noise, 0, 255).astype(np.uint8)
+        self.texture_array[y, x] = noisy_color
+
+    def set_fill_mode(self, mode, random_std=None):
+        """
+        Set the fill mode for painting
+
+        Args:
+            mode: 'solid' or 'random'
+            random_std: Standard deviation for random mode (optional)
+        """
+        self.fill_mode = mode
+        if random_std is not None:
+            self.random_std = random_std
+
+    def get_fill_function(self):
+        """Get the current fill function based on fill_mode"""
+        if self.fill_mode == self.FILL_RANDOM:
+            return self._fill_random
+        else:
+            return self._fill_solid
+
+    def paint_at_world_pos(self, point_world, radius_pixels=3, color=(255, 255, 255), fill_func=None):
         """
         Paint on texture at the UV location corresponding to world position
 
         Args:
             point_world: 3D point in world coordinates
             radius_pixels: radius of painted area in pixels
-            color: RGB color tuple (default white)
+            color: RGB color tuple (default black)
+            fill_func: Custom fill function(x, y, color), or None to use default
 
         Returns:
             (u, v) UV coordinates where painted, or None if outside mesh
@@ -376,14 +419,19 @@ class TexturePainter:
         px = int(uv[0] * self.width)
         py = int((1.0 - uv[1]) * self.height)  # Flip Y
 
+        # Get fill function
+        if fill_func is None:
+            fill_func = self.get_fill_function()
+
         # Paint circle of radius k pixels
         for dy in range(-radius_pixels, radius_pixels + 1):
             for dx in range(-radius_pixels, radius_pixels + 1):
                 if dx * dx + dy * dy <= radius_pixels * radius_pixels:
                     x = px + dx
                     y = py + dy
+                    current_color = tuple(min(255, max(0, int(c * random.uniform(0.6, 0.8)))) for c in color) if self.fill_mode == self.FILL_RANDOM else color
                     if 0 <= x < self.width and 0 <= y < self.height:
-                        self.texture_array[y, x] = color
+                        fill_func(x, y, current_color)
 
         return uv
 
@@ -776,12 +824,18 @@ def create_side_by_side_video(capture_dir, output_filename='video.mp4', fps=30):
     # Build ffmpeg command for 2x2 grid
     # Layout: [top_view | angle_view]
     #         [tool_view | black    ]
+    # Add white text labels in top-left corner of each frame
+    font_size = max(16, frame_height // 20)  # Scale font with frame size
+
     if len(tool_frames) > 0:
-        # 2x2 grid with tool_view
+        # 2x2 grid with tool_view and text labels
         filter_complex = (
             f"color=black:{frame_width}x{frame_height}:d={len(top_frames)/fps}[black];"
-            f"[0:v][1:v]hstack=inputs=2[top];"
-            f"[2:v][black]hstack=inputs=2[bottom];"
+            f"[0:v]drawtext=text='top_view':x=10:y=10:fontsize={font_size}:fontcolor=white[top_labeled];"
+            f"[1:v]drawtext=text='angle_view':x=10:y=10:fontsize={font_size}:fontcolor=white[angle_labeled];"
+            f"[2:v]drawtext=text='tool_view':x=10:y=10:fontsize={font_size}:fontcolor=white[tool_labeled];"
+            f"[top_labeled][angle_labeled]hstack=inputs=2[top];"
+            f"[tool_labeled][black]hstack=inputs=2[bottom];"
             f"[top][bottom]vstack=inputs=2[out]"
         )
         cmd = [
@@ -800,14 +854,20 @@ def create_side_by_side_video(capture_dir, output_filename='video.mp4', fps=30):
             str(output_path)
         ]
     else:
-        # Fallback to side-by-side if no tool_view
+        # Fallback to side-by-side if no tool_view, with text labels
+        filter_complex = (
+            f"[0:v]drawtext=text='top_view':x=10:y=10:fontsize={font_size}:fontcolor=white[top_labeled];"
+            f"[1:v]drawtext=text='angle_view':x=10:y=10:fontsize={font_size}:fontcolor=white[angle_labeled];"
+            f"[top_labeled][angle_labeled]hstack=inputs=2[out]"
+        )
         cmd = [
             'ffmpeg', '-y',
             '-framerate', str(fps),
             '-i', str(top_view_dir / 'frame_%05d.png'),
             '-framerate', str(fps),
             '-i', str(angle_view_dir / 'frame_%05d.png'),
-            '-filter_complex', 'hstack=inputs=2',
+            '-filter_complex', filter_complex,
+            '-map', '[out]',
             '-c:v', 'libx264',
             '-pix_fmt', 'yuv420p',
             '-crf', '23',
