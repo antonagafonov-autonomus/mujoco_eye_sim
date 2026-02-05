@@ -23,7 +23,9 @@ from utils import (
     TexturePainter,
     generate_ellipsoid_trajectory,
     generate_random_trajectory_params,
-    load_obj_with_uv
+    load_obj_with_uv,
+    RCMController,
+    calculate_rcm_from_lens
 )
 
 from analyze_lens import (
@@ -161,6 +163,22 @@ def run_iteration(iteration_idx, args, lens_geometry, scene_path, base_output_di
     print(f"  Rotation: {np.degrees(traj_params['rotation_angle']):.1f} deg")
     print(f"  Noise std: {traj_params['noise_std']*1000:.3f} mm")
 
+    # Calculate RCM position if RCM mode is enabled
+    rcm_controller = None
+    if args.rcm:
+        rcm_world = calculate_rcm_from_lens(
+            lens_geometry,
+            rotation_angle=traj_params['rotation_angle'],
+            eye_pos=args.eye_pos,
+            rcm_radius=args.rcm_radius,
+            rcm_height=args.rcm_height
+        )
+        rcm_controller = RCMController(rcm_world)
+        print(f"\nRCM parameters:")
+        print(f"  RCM position: [{rcm_world[0]:.4f}, {rcm_world[1]:.4f}, {rcm_world[2]:.4f}]")
+        print(f"  RCM radius: {args.rcm_radius*1000:.1f} mm")
+        print(f"  RCM height: {args.rcm_height*1000:.1f} mm")
+
     # Generate ellipsoid trajectory
     trajectory_local = generate_ellipsoid_trajectory(
         lens_geometry,
@@ -221,7 +239,8 @@ def run_iteration(iteration_idx, args, lens_geometry, scene_path, base_output_di
         model, data, projected_world, iter_output_dir,
         width=args.width, height=args.height,
         painter=painter, paint_radius=args.paint_radius,
-        scene_path=scene_path
+        scene_path=scene_path,
+        rcm_controller=rcm_controller
     )
 
     return iter_output_dir
@@ -281,6 +300,14 @@ def main():
                         metavar=('X', 'Y', 'Z'),
                         help='Eye assembly position in world coordinates')
 
+    # RCM (Remote Center of Motion) options
+    parser.add_argument('--rcm', action='store_true',
+                        help='Enable RCM constraint for tool orientation')
+    parser.add_argument('--rcm-radius', type=float, default=0.005,
+                        help='RCM distance from lens center in meters (default 5mm)')
+    parser.add_argument('--rcm-height', type=float, default=0.006,
+                        help='RCM height above lens surface in meters (default 6mm, tool reach is 8mm)')
+
     args = parser.parse_args()
 
     print("\n" + "="*60)
@@ -296,6 +323,26 @@ def main():
 
         print("\nMode: Single trajectory file")
         trajectory_world, metadata = load_trajectory_file(args.trajectory_file)
+
+        # Initialize RCM controller if requested
+        rcm_controller = None
+        if args.rcm:
+            print("\nInitializing RCM controller...")
+            # Need lens geometry to calculate RCM position
+            lens_geometry = analyze_lens_geometry(args.mesh)
+            # Get rotation angle from trajectory metadata (default 0 if not present)
+            rotation_angle = metadata.get('parameters', {}).get('rotation_angle', 0.0)
+            rcm_world = calculate_rcm_from_lens(
+                lens_geometry,
+                rotation_angle=rotation_angle,
+                eye_pos=args.eye_pos,
+                rcm_radius=args.rcm_radius,
+                rcm_height=args.rcm_height
+            )
+            rcm_controller = RCMController(rcm_world)
+            print(f"  RCM position: [{rcm_world[0]:.4f}, {rcm_world[1]:.4f}, {rcm_world[2]:.4f}]")
+            print(f"  RCM radius: {args.rcm_radius*1000:.1f} mm")
+            print(f"  RCM height: {args.rcm_height*1000:.1f} mm")
 
         # Initialize painter if requested
         painter = None
@@ -327,13 +374,15 @@ def main():
                 model, data, trajectory_world, output_dir,
                 width=args.width, height=args.height,
                 painter=painter, paint_radius=args.paint_radius,
-                scene_path=scene_path
+                scene_path=scene_path,
+                rcm_controller=rcm_controller
             )
         else:
             move_tool_along_trajectory(
                 model, data, trajectory_world,
                 speed=args.speed,
-                painter=painter, paint_radius=args.paint_radius
+                painter=painter, paint_radius=args.paint_radius,
+                rcm_controller=rcm_controller
             )
 
     else:
@@ -377,7 +426,12 @@ def main():
             'resolution': [args.width, args.height],
             'paint': args.paint,
             'paint_radius': args.paint_radius,
-            'cameras': camera_params
+            'cameras': camera_params,
+            'rcm': {
+                'enabled': args.rcm,
+                'radius': args.rcm_radius,
+                'height': args.rcm_height
+            }
         }
         with open(base_output_dir / 'config.json', 'w') as f:
             json.dump(config, f, indent=2)

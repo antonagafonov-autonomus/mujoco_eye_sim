@@ -9,15 +9,15 @@
 ITERATIONS=10
 
 # Ellipse parameters (in meters)
-RADIUS_X=0.0028       # 3mm semi-major axis
+RADIUS_X=0.003       # 3mm semi-major axis
 RADIUS_Y=0.003       # 2mm semi-minor axis
 
 # Randomization (smaller values = more consistent trajectories)
-RADIUS_STD=0.0001    # 0.2mm std for radius variation
-CENTER_STD=0.0001    # 0.3mm std for center offset - keeps ellipse centered
+RADIUS_STD=0.0002    # 0.2mm std for radius variation
+CENTER_STD=0.0002    # 0.3mm std for center offset - keeps ellipse centered
 
 # Trajectory points
-NUM_POINTS=300
+NUM_POINTS=60
 
 # Capture settings
 CAPTURE=true         # Enable/disable image capture
@@ -27,6 +27,11 @@ HEIGHT=480
 # Painting settings
 PAINT=true           # Enable/disable UV texture painting
 PAINT_RADIUS=3       # Pixels on UV texture
+
+# RCM (Remote Center of Motion) settings
+RCM=true             # Enable/disable RCM constraint for tool orientation
+RCM_RADIUS=0.005     # 5mm distance from lens center to RCM
+RCM_HEIGHT=0.004     # 6mm height above lens (tool reach is 8mm)
 
 # =============================================================================
 # BUILD COMMAND
@@ -45,6 +50,10 @@ if [ "$PAINT" = true ]; then
     CMD="$CMD --paint --paint-radius $PAINT_RADIUS"
 fi
 
+if [ "$RCM" = true ]; then
+    CMD="$CMD --rcm --rcm-radius $RCM_RADIUS --rcm-height $RCM_HEIGHT"
+fi
+
 # =============================================================================
 # RUN
 # =============================================================================
@@ -59,6 +68,7 @@ echo "Center std: ${CENTER_STD}m"
 echo "Points: $NUM_POINTS"
 echo "Capture: $CAPTURE (${WIDTH}x${HEIGHT})"
 echo "Paint: $PAINT (radius=${PAINT_RADIUS}px)"
+echo "RCM: $RCM (radius=${RCM_RADIUS}m, height=${RCM_HEIGHT}m)"
 echo "============================================"
 echo "Command: $CMD"
 echo "============================================"

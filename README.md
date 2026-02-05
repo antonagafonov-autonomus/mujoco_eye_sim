@@ -12,6 +12,18 @@ This simulation models an anatomically detailed eye with support for:
 - Multi-iteration dataset generation with capture
 - Automatic side-by-side video generation
 - Multiple camera viewpoints for visualization
+- RCM (Remote Center of Motion) constraint for realistic tool orientation
+
+### RCM Constraint
+
+The RCM (Remote Center of Motion) feature simulates realistic surgical tool behavior where the tool shaft must pass through a fixed incision point (the RCM). This is common in minimally invasive surgery where the tool enters through a small incision.
+
+When enabled (`--rcm`), the tool orientation is automatically calculated so that:
+- The tool's local RCM point coincides with a fixed world RCM position
+- The tool tip follows the desired trajectory on the lens surface
+- The tool shaft always passes through the RCM point
+
+The RCM position is calculated based on the trajectory's rotation angle, placed opposite to the trajectory start point at a configurable radius and height above the lens surface.
 
 ## Quick Start
 
@@ -50,6 +62,9 @@ PAINT=true           # Enable/disable UV texture painting
 WIDTH=640            # Capture width
 HEIGHT=480           # Capture height
 PAINT_RADIUS=3       # Paint brush size in pixels
+RCM=true             # Enable RCM constraint for tool orientation
+RCM_RADIUS=0.005     # 5mm distance from lens center to RCM
+RCM_HEIGHT=0.006     # 6mm height above lens (tool reach is 8mm)
 ```
 
 ---
@@ -95,6 +110,9 @@ python3 tool_controller.py --iterations 5 --capture --paint \
 | `--scene` | ../scene/eye_scene.xml | Scene file path |
 | `--output`, `-o` | ../captures | Output directory |
 | `--eye-pos` | 0 0 0.1 | Eye assembly position (X Y Z) |
+| `--rcm` | flag | Enable RCM constraint for tool orientation |
+| `--rcm-radius` | 0.005 | RCM distance from lens center (m) |
+| `--rcm-height` | 0.006 | RCM height above lens surface (m) |
 
 ---
 

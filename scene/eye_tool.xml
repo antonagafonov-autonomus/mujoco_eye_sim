@@ -1,13 +1,28 @@
 <mujoco>
   <!-- Surgical tool (diathermic tip) -->
   <worldbody>
-    <body name="diathermic_tip" pos="0.04 -0.015 0.27" euler="0 0 45" mocap="true">
+    <body name="diathermic_tip" pos="0.04 -0.02 0.27" euler="0 0 45" mocap="true">
       <!-- Visual geometry -->
       <geom name="tool_geom" type="mesh" mesh="diathermic_tip"
             material="tool_mat" contype="0" conaffinity="0"/>
 
       <!-- Tool tip marker (red sphere) -->
-      <site name="tool_tip" pos="0 0.01 0.0025" size="0.0005" rgba="1 0 0 1"/>
+      <site name="tool_tip" pos="0 0.01 0" size="0.0005" rgba="1 0 0 1"/>
+
+      <!-- Tool tip coordinate frame (child body at tip position, rotated 45° around Z relative to tool) -->
+      <body name="tip_frame" pos="0 0.01 0" euler="0 0 60">
+        <!-- <geom name="tip_x_axis" type="cylinder" size="0.0003 0.005" pos="0.005 0 0"
+              euler="0 90 0" rgba="1 0 0 0.8" contype="0" conaffinity="0"/>
+        <geom name="tip_y_axis" type="cylinder" size="0.0003 0.005" pos="0 0.005 0"
+              euler="90 0 0" rgba="0 1 0 0.8" contype="0" conaffinity="0"/>
+        <geom name="tip_z_axis" type="cylinder" size="0.0003 0.005" pos="0 0 0.005"
+              euler="0 0 0" rgba="0 0 1 0.8" contype="0" conaffinity="0"/> -->
+      <!-- RCM location -->
+      <site name="RCM" pos="-0.008 0 0" size="0.0005" rgba="1 0 0 1"/>
+      <!-- RCM visual marker (yellow sphere for visibility in video) -->
+      <geom name="rcm_marker" type="sphere" size="0.001" pos="-0.008 0 0"
+            rgba="1 1 0 0.8" contype="0" conaffinity="0"/>
+      </body>
 
       <!-- On-tool camera (end effector view) -->
       <camera name="tool_view" pos="0 -0.1 0.0" euler="90 0 0" fovy="15"/>

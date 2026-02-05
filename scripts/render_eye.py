@@ -25,7 +25,7 @@ def render_eye_scene(scene_path='../scene/eye_scene.xml', show_viewer=True, save
         with mujoco.viewer.launch_passive(model, data) as viewer:
             # Set initial camera to top view
             viewer.cam.fixedcamid = 0  # top_view camera
-            viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
+            viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
             
             while viewer.is_running():
                 mujoco.mj_step(model, data)

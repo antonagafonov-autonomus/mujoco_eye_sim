@@ -25,7 +25,7 @@ from PIL import Image
 def get_tool_offset():
     """Calculate tool tip offset in world coordinates"""
     # Tool tip offset in local coordinates (from XML: site pos="0 0.01 0.0025")
-    tip_local = np.array([0, 0.01, 0.0025])
+    tip_local = np.array([0, 0.01, 0])
 
     # Body rotation: euler="0 0 45" means 45 degrees around Z
     angle_z = np.radians(45)
@@ -37,6 +37,262 @@ def get_tool_offset():
         [0,      0,     1]
     ])
     return R @ tip_local
+
+
+# =============================================================================
+# RCM (REMOTE CENTER OF MOTION) CONTROLLER
+# =============================================================================
+
+# Tool geometry constants (from eye_tool.xml)
+# RCM is inside tip_frame body: tip_frame pos="0 0.01 0" euler="0 0 60", RCM pos="-0.008 0 0"
+# Transform: RCM_body = tip_pos + R_z(60°) @ (-0.008, 0, 0) = (-0.004, 0.00307, 0.0025)
+_cos60 = np.cos(np.radians(60))  # 0.5
+_sin60 = np.sin(np.radians(60))  # 0.866
+RCM_IN_TIP_FRAME = np.array([-0.008, 0, 0])      # RCM position in tip_frame local coords
+TIP_LOCAL_OFFSET = np.array([0, 0.01, 0])   # Tip position in tool body frame
+# RCM in tool body frame (tip_pos + rotated RCM_in_tip_frame)
+RCM_LOCAL_OFFSET = TIP_LOCAL_OFFSET + np.array([
+    _cos60 * RCM_IN_TIP_FRAME[0] - _sin60 * RCM_IN_TIP_FRAME[1],
+    _sin60 * RCM_IN_TIP_FRAME[0] + _cos60 * RCM_IN_TIP_FRAME[1],
+    RCM_IN_TIP_FRAME[2]
+])  # ≈ (-0.004, 0.00307, 0.0025)
+
+
+class RCMController:
+    """
+    Remote Center of Motion (RCM) Controller
+
+    Calculates tool body position and orientation such that:
+    - The tool's local RCM point coincides with a fixed world RCM position
+    - The tool's tip follows the desired trajectory
+    - The bent portion of the tool passes through the RCM point
+
+    Tool geometry (local frame, looking from above):
+        The RCM is on the bent portion, 8mm back from tip along tip_frame X axis.
+
+                        Origin (0,0,0)
+                           |
+                           | bent 60° around Z
+                           |
+        RCM ←----8mm----→ Tip (0, 0.01, 0.0025)
+
+        RCM in body frame ≈ (-0.004, 0.003, 0.0025)
+        RCM-to-tip distance = 8mm
+    """
+
+    def __init__(self, rcm_world_pos):
+        """
+        Args:
+            rcm_world_pos: [x,y,z] fixed RCM position in world coordinates
+        """
+        self.rcm_world = np.array(rcm_world_pos)
+        self.rcm_local = RCM_LOCAL_OFFSET.copy()
+        self.tip_local = TIP_LOCAL_OFFSET.copy()
+
+        # Vector from RCM to tip in local frame (this is what we align)
+        self.rcm_to_tip_local = self.tip_local - self.rcm_local
+
+        # Distance from RCM to tip (fixed by tool geometry)
+        self.rcm_to_tip_distance = np.linalg.norm(self.rcm_to_tip_local)
+
+        # Debug output
+        print(f"\n  [RCM DEBUG] RCM_LOCAL_OFFSET: {self.rcm_local}")
+        print(f"  [RCM DEBUG] TIP_LOCAL_OFFSET: {self.tip_local}")
+        print(f"  [RCM DEBUG] rcm_to_tip_local: {self.rcm_to_tip_local}")
+        print(f"  [RCM DEBUG] rcm_to_tip_distance: {self.rcm_to_tip_distance*1000:.2f} mm")
+
+    def calculate_tool_pose(self, tip_world_pos):
+        """
+        Calculate tool body position and orientation given desired tip position.
+
+        The key insight: the vector from RCM to tip in local frame must map to
+        the vector from rcm_world to tip_world. This determines the rotation.
+        Then body_position = rcm_world - R @ rcm_local.
+
+        Args:
+            tip_world_pos: [x,y,z] desired tip position in world coordinates
+
+        Returns:
+            dict with:
+                - body_position: [x,y,z] tool body position
+                - quaternion: [w,x,y,z] tool orientation quaternion
+                - euler_deg: [rx,ry,rz] euler angles in degrees
+                - rotation_matrix: 3x3 rotation matrix
+        """
+        tip_world = np.array(tip_world_pos)
+
+        # 1. Vector from RCM to tip in world frame
+        rcm_to_tip_world = tip_world - self.rcm_world
+        distance = np.linalg.norm(rcm_to_tip_world)
+
+        if distance < 1e-6:
+            raise ValueError("Tip position too close to RCM")
+
+        # Normalize both vectors for rotation calculation
+        rcm_to_tip_local_norm = self.rcm_to_tip_local / self.rcm_to_tip_distance
+        rcm_to_tip_world_norm = rcm_to_tip_world / distance
+
+        # 2. Calculate rotation matrix that aligns rcm_to_tip_local with rcm_to_tip_world
+        rotation_matrix = self._rotation_matrix_from_vectors(
+            rcm_to_tip_local_norm,   # Local direction from RCM to tip
+            rcm_to_tip_world_norm    # World direction from RCM to tip
+        )
+
+        # 3. Calculate body position
+        # Tool slides through RCM - tip must be at desired position
+        # tip_world = body_position + R @ tip_local
+        # So: body_position = tip_world - R @ tip_local
+        body_position = tip_world - rotation_matrix @ self.tip_local
+
+        # 4. Convert rotation matrix to quaternion
+        quaternion = self._rotation_matrix_to_quaternion(rotation_matrix)
+
+        # 5. Convert to euler angles (for logging)
+        euler_deg = self._rotation_matrix_to_euler(rotation_matrix)
+
+        # 6. Calculate shaft direction in world (for reference)
+        shaft_dir = rotation_matrix @ np.array([1, 0, 0])
+
+        return {
+            'body_position': body_position,
+            'quaternion': quaternion,
+            'euler_deg': euler_deg,
+            'rotation_matrix': rotation_matrix,
+            'shaft_direction': shaft_dir
+        }
+
+    def _rotation_matrix_from_vectors(self, vec_from, vec_to):
+        """
+        Calculate rotation matrix that rotates vec_from to vec_to.
+        Uses Rodrigues' rotation formula.
+        """
+        vec_from = vec_from / np.linalg.norm(vec_from)
+        vec_to = vec_to / np.linalg.norm(vec_to)
+
+        # Cross product gives rotation axis
+        cross = np.cross(vec_from, vec_to)
+        cross_norm = np.linalg.norm(cross)
+
+        # Dot product gives cosine of angle
+        dot = np.dot(vec_from, vec_to)
+
+        # Handle parallel vectors
+        if cross_norm < 1e-6:
+            if dot > 0:
+                # Same direction
+                return np.eye(3)
+            else:
+                # Opposite direction - rotate 180° around any perpendicular axis
+                perp = np.array([1, 0, 0]) if abs(vec_from[0]) < 0.9 else np.array([0, 1, 0])
+                perp = perp - np.dot(perp, vec_from) * vec_from
+                perp = perp / np.linalg.norm(perp)
+                return 2 * np.outer(perp, perp) - np.eye(3)
+
+        # Rodrigues' formula
+        axis = cross / cross_norm
+        angle = np.arctan2(cross_norm, dot)
+
+        K = np.array([
+            [0, -axis[2], axis[1]],
+            [axis[2], 0, -axis[0]],
+            [-axis[1], axis[0], 0]
+        ])
+
+        R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * (K @ K)
+        return R
+
+    def _rotation_matrix_to_quaternion(self, R):
+        """Convert 3x3 rotation matrix to quaternion [w, x, y, z]"""
+        trace = np.trace(R)
+
+        if trace > 0:
+            s = 0.5 / np.sqrt(trace + 1.0)
+            w = 0.25 / s
+            x = (R[2, 1] - R[1, 2]) * s
+            y = (R[0, 2] - R[2, 0]) * s
+            z = (R[1, 0] - R[0, 1]) * s
+        elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+            s = 2.0 * np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
+            w = (R[2, 1] - R[1, 2]) / s
+            x = 0.25 * s
+            y = (R[0, 1] + R[1, 0]) / s
+            z = (R[0, 2] + R[2, 0]) / s
+        elif R[1, 1] > R[2, 2]:
+            s = 2.0 * np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
+            w = (R[0, 2] - R[2, 0]) / s
+            x = (R[0, 1] + R[1, 0]) / s
+            y = 0.25 * s
+            z = (R[1, 2] + R[2, 1]) / s
+        else:
+            s = 2.0 * np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
+            w = (R[1, 0] - R[0, 1]) / s
+            x = (R[0, 2] + R[2, 0]) / s
+            y = (R[1, 2] + R[2, 1]) / s
+            z = 0.25 * s
+
+        return np.array([w, x, y, z])
+
+    def _rotation_matrix_to_euler(self, R):
+        """Convert rotation matrix to euler angles (XYZ intrinsic) in degrees"""
+        sy = R[0, 2]
+
+        if abs(sy) < 0.99999:
+            y = np.arcsin(sy)
+            x = np.arctan2(-R[1, 2], R[2, 2])
+            z = np.arctan2(-R[0, 1], R[0, 0])
+        else:
+            # Gimbal lock
+            y = np.pi / 2 * np.sign(sy)
+            x = np.arctan2(R[2, 1], R[1, 1])
+            z = 0
+
+        return np.degrees([x, y, z])
+
+
+def calculate_rcm_from_lens(lens_geometry, rotation_angle, eye_pos,
+                            rcm_radius=0.005, rcm_height=0.006):
+    """
+    Calculate world RCM position based on lens geometry and trajectory start angle.
+
+    The RCM is positioned:
+    - At angle (rotation_angle + 180°) around lens center (opposite to trajectory start)
+    - At rcm_radius from lens center (in lens plane)
+    - At rcm_height TOWARD the cornea (opposite to lens normal, which points to back of eye)
+
+    The tool enters from the front of the eye (cornea side), so RCM is placed
+    in the NEGATIVE normal direction (toward cornea, away from vitreous).
+
+    Args:
+        lens_geometry: dict from analyze_lens_geometry()
+        rotation_angle: trajectory rotation angle in radians
+        eye_pos: [x,y,z] eye assembly position in world
+        rcm_radius: distance from lens center in lens plane (default 5mm)
+        rcm_height: height toward cornea from lens surface (default 6mm)
+
+    Returns:
+        rcm_world: [x,y,z] RCM position in world coordinates
+    """
+    # Get lens coordinate frame
+    lens_center_local = lens_geometry['center_local']
+    x_axis = lens_geometry['coord_frame']['x_axis']
+    y_axis = lens_geometry['coord_frame']['y_axis']
+    normal = lens_geometry['coord_frame']['z_axis']
+
+    # RCM angle is opposite to trajectory start (180° offset)
+    rcm_angle = rotation_angle + np.pi
+
+    # Calculate RCM position in local coordinates
+    # Note: NEGATIVE normal direction places RCM toward cornea (front of eye)
+    # The lens normal points toward back of eye, so we subtract to go toward front
+    rcm_local = (lens_center_local
+                 + rcm_radius * np.cos(rcm_angle) * x_axis
+                 + rcm_radius * np.sin(rcm_angle) * y_axis
+                 - rcm_height * normal)  # NEGATIVE: toward cornea/front
+
+    # Transform to world coordinates
+    rcm_world = rcm_local + np.array(eye_pos)
+
+    return rcm_world
 
 
 # =============================================================================
@@ -299,7 +555,7 @@ def generate_random_trajectory_params(base_radius_x=0.003, base_radius_y=0.002,
         'radius_y': max(0.001, np.random.normal(base_radius_y, radius_std)),
         'center_offset_x': np.random.normal(0, center_std),
         'center_offset_y': np.random.normal(0, center_std),
-        'rotation_angle': np.random.uniform(rotation_range[0], rotation_range[1]),
+        'rotation_angle': (3/2)*np.pi,
         'noise_std': np.random.uniform(0.00002, 0.0001)  # 0.02-0.1mm noise per point
     }
     return params
@@ -317,7 +573,7 @@ class TexturePainter:
     FILL_RANDOM = 'random'
 
     def __init__(self, texture_path, mesh_path, eye_assembly_pos, use_temp=True,
-                 fill_mode='random', random_std=30):
+                 fill_mode='solid', random_std=30):
         """
         Initialize texture painter
 
@@ -530,7 +786,8 @@ def run_with_capture(model, data, trajectory_world, output_dir,
                      tool_body_name='diathermic_tip',
                      width=640, height=480,
                      painter=None, paint_radius=3,
-                     scene_path=None):
+                     scene_path=None,
+                     rcm_controller=None):
     """
     Run trajectory and capture images from both cameras
     Optionally paint trajectory on lens texture
@@ -546,11 +803,18 @@ def run_with_capture(model, data, trajectory_world, output_dir,
         painter: TexturePainter instance (optional)
         paint_radius: Radius in pixels for painting (default 3)
         scene_path: Path to scene XML (required if painter is used)
+        rcm_controller: RCMController instance for tool orientation (optional)
+                        If provided, tool orientation follows RCM constraint.
+                        If None, tool uses fixed orientation (legacy behavior).
 
     Returns:
         Path to saved JSON log file
     """
     tip_world_offset = get_tool_offset()
+
+    # Fake time increment per frame (no actual physics simulation)
+    # We use model timestep for consistent time logging, but simulation is not stepped
+    fake_timestep = model.opt.timestep
 
     # Create output directories
     output_path = Path(output_dir)
@@ -565,6 +829,12 @@ def run_with_capture(model, data, trajectory_world, output_dir,
     print(f"\n✓ Starting capture: {len(trajectory_world)} frames")
     print(f"  Output: {output_path}")
     print(f"  Resolution: {width}x{height}")
+    print(f"  Time mode: FAKE (no physics simulation, timestep={fake_timestep}s)")
+    if rcm_controller:
+        print(f"  RCM mode: ENABLED (tool orientation follows RCM constraint)")
+        print(f"    RCM position: [{rcm_controller.rcm_world[0]:.4f}, {rcm_controller.rcm_world[1]:.4f}, {rcm_controller.rcm_world[2]:.4f}]")
+    else:
+        print(f"  RCM mode: DISABLED (fixed orientation)")
     if painter:
         print(f"  Painting trajectory on texture (radius={paint_radius}px)")
         print(f"  Reloading model each frame for texture updates")
@@ -602,12 +872,27 @@ def run_with_capture(model, data, trajectory_world, output_dir,
             # Create renderer for this frame (model changed)
             renderer = mujoco.Renderer(model, height, width)
 
-        # Update tool position
-        body_pos = tip_pos - tip_world_offset
-        data.mocap_pos[mocap_id] = body_pos
+        # Update tool position and orientation
+        if rcm_controller:
+            # Use RCM controller for realistic tool orientation
+            tool_pose = rcm_controller.calculate_tool_pose(tip_pos)
+            body_pos = tool_pose['body_position']
+            body_quat = tool_pose['quaternion']
+            euler_deg = tool_pose['euler_deg']
+            data.mocap_pos[mocap_id] = body_pos
+            data.mocap_quat[mocap_id] = body_quat
+        else:
+            # Legacy behavior: fixed orientation, only translate
+            body_pos = tip_pos - tip_world_offset
+            data.mocap_pos[mocap_id] = body_pos
+            euler_deg = np.array([0, 0, 45])  # Default euler angles
 
-        # Step simulation
+        # Compute forward kinematics (no physics simulation)
         mujoco.mj_forward(model, data)
+
+        # Increment fake time (no actual simulation stepping)
+        # This provides consistent timestamps for logging without computing physics/contacts
+        data.time = idx * fake_timestep
 
         # Render all three views
         renderer.update_scene(data, camera=top_view_id)
@@ -626,15 +911,15 @@ def run_with_capture(model, data, trajectory_world, output_dir,
         if painter:
             renderer.close()
 
-        # Tool orientation as rotation vector (axis * angle)
-        rot_vec = np.array([0, 0, np.radians(45)])
+        # Tool orientation as rotation vector (euler angles in radians)
+        rot_vec = np.radians(euler_deg)
 
         # Log position
         position_log.append({
             'frame': idx,
             'tip_position': tip_pos.tolist(),  # [x, y, z]
             'tool_trv': np.concatenate([body_pos, rot_vec]).tolist(),  # [x, y, z, rx, ry, rz]
-            'simulation_time': data.time
+            'time': data.time  # Fake time: frame_idx * timestep (no physics simulation)
         })
 
         # Progress
@@ -656,7 +941,9 @@ def run_with_capture(model, data, trajectory_world, output_dir,
             'num_frames': len(trajectory_world),
             'resolution': [width, height],
             'cameras': ['top_view', 'angle_view', 'tool_view'],
-            'trajectory_painted': painter is not None
+            'trajectory_painted': painter is not None,
+            'time_mode': 'fake',  # No physics simulation, time is frame_idx * timestep
+            'timestep': fake_timestep
         },
         'frames': position_log
     }
@@ -680,7 +967,8 @@ def run_with_capture(model, data, trajectory_world, output_dir,
 def move_tool_along_trajectory(model, data, trajectory_world,
                                tool_body_name='diathermic_tip',
                                speed=1.0,
-                               painter=None, paint_radius=3):
+                               painter=None, paint_radius=3,
+                               rcm_controller=None):
     """
     Move tool along trajectory in interactive viewer
     Optionally paint trajectory on lens texture
@@ -693,6 +981,7 @@ def move_tool_along_trajectory(model, data, trajectory_world,
         speed: Animation speed multiplier
         painter: TexturePainter instance (optional)
         paint_radius: Radius in pixels for painting (default 3)
+        rcm_controller: RCMController instance for tool orientation (optional)
     """
     # Get tool body ID
     tool_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, tool_body_name)
@@ -705,6 +994,11 @@ def move_tool_along_trajectory(model, data, trajectory_world,
     print(f"✓ Number of mocap bodies: {model.nmocap}")
     print(f"✓ Tip offset (world): {tip_world_offset}")
     print(f"✓ Starting tip position: {trajectory_world[0]}")
+    if rcm_controller:
+        print(f"✓ RCM mode: ENABLED")
+        print(f"  RCM position: [{rcm_controller.rcm_world[0]:.4f}, {rcm_controller.rcm_world[1]:.4f}, {rcm_controller.rcm_world[2]:.4f}]")
+    else:
+        print(f"✓ RCM mode: DISABLED (fixed orientation)")
     if painter:
         print(f"✓ Painting enabled (radius={paint_radius}px)")
         print(f"  Note: Live texture updates not visible in viewer.")
@@ -731,9 +1025,16 @@ def move_tool_along_trajectory(model, data, trajectory_world,
         print(f"  Total points: {len(trajectory_world)}")
 
         while viewer.is_running():
-            # Update tool position
+            # Update tool position and orientation
             tip_pos = trajectory_world[current_idx]
-            data.mocap_pos[mocap_id] = tip_pos - tip_world_offset
+            if rcm_controller:
+                # Use RCM controller for realistic tool orientation
+                tool_pose = rcm_controller.calculate_tool_pose(tip_pos)
+                data.mocap_pos[mocap_id] = tool_pose['body_position']
+                data.mocap_quat[mocap_id] = tool_pose['quaternion']
+            else:
+                # Legacy behavior: fixed orientation, only translate
+                data.mocap_pos[mocap_id] = tip_pos - tip_world_offset
 
             # Paint on texture if painter provided (only on new points)
             if painter and frame_counter == 0:
