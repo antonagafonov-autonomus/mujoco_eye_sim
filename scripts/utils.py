@@ -571,9 +571,10 @@ class TexturePainter:
     # Fill mode constants
     FILL_SOLID = 'solid'
     FILL_RANDOM = 'random'
+    FILL_BUBBLE = 'bubble'
 
     def __init__(self, texture_path, mesh_path, eye_assembly_pos, use_temp=True,
-                 fill_mode='solid', random_std=30):
+                 fill_mode='bubble', random_std=30):
         """
         Initialize texture painter
 
@@ -633,12 +634,28 @@ class TexturePainter:
         noisy_color = np.clip(np.array(color) + noise, 0, 255).astype(np.uint8)
         self.texture_array[y, x] = noisy_color
 
+    def _fill_bubble(self, x, y, color):
+        """
+        Fill pixel with noisy white color (for bubble mode)
+
+        Args:
+            x, y: Pixel coordinates
+            color: Ignored - uses white range instead
+        """
+        # Noise in white range (200-255)
+        noisy_color = np.array([
+            random.randint(200, 255),
+            random.randint(200, 255),
+            random.randint(200, 255)
+        ], dtype=np.uint8)
+        self.texture_array[y, x] = noisy_color
+
     def set_fill_mode(self, mode, random_std=None):
         """
         Set the fill mode for painting
 
         Args:
-            mode: 'solid' or 'random'
+            mode: 'solid', 'random', or 'bubble'
             random_std: Standard deviation for random mode (optional)
         """
         self.fill_mode = mode
@@ -649,6 +666,8 @@ class TexturePainter:
         """Get the current fill function based on fill_mode"""
         if self.fill_mode == self.FILL_RANDOM:
             return self._fill_random
+        elif self.fill_mode == self.FILL_BUBBLE:
+            return self._fill_bubble
         else:
             return self._fill_solid
 
@@ -678,6 +697,10 @@ class TexturePainter:
         # Get fill function
         if fill_func is None:
             fill_func = self.get_fill_function()
+
+        # For bubble mode, add random variation to radius
+        if self.fill_mode == self.FILL_BUBBLE:
+            radius_pixels = radius_pixels + random.randint(0, 3)
 
         # Paint circle of radius k pixels
         for dy in range(-radius_pixels, radius_pixels + 1):
