@@ -1,0 +1,74 @@
+{
+  "name": "diathermy",
+  "description": "Diathermy procedure: insertion, trajectory, retraction",
+  "scene": "../../scene/eye_scene.xml",
+
+  "rcm": {
+    "radius": 0.005,
+    "height": 0.004,
+    "tool_roll": -45
+  },
+
+  "capture": {
+    "width": 640,
+    "height": 480
+  },
+
+  "painting": {
+    "enabled": true,
+    "radius": 3,
+    "fill_mode": "bubble"
+  },
+
+  "lighting": {
+    "vary": true,
+    "intensity_range": [0.3, 0.7],
+    "diffuse_range": [0.3, 0.7]
+  },
+
+  "mesh": "../../meshes/Lens_L_extracted.obj",
+  "texture": "../../textures/lens_uv_map.png",
+  "eye_pos": [0, 0, 0.1],
+
+  "steps": [
+    {
+      "name": "insertion",
+      "type": "insertion",
+      "params": {
+        "initial_position": [0.040, -0.0077, 0.2703],
+        "start_offset_x": 0.020,
+        "motion_type": "linear",
+        "num_frames": 50,
+        "pause_frames": 10,
+        "paint": false,
+        "use_rcm": false,
+        "initial_euler": [-25.9, -43.7, 101.2]
+      }
+    },
+    {
+      "name": "diathermy_trajectory",
+      "type": "trajectory",
+      "params": {
+        "shape": "ellipse",
+        "radius_x": 0.003,
+        "radius_y": 0.003,
+        "radius_std": 0.0002,
+        "center_std": 0.0002,
+        "num_points": 60,
+        "offset": 0.0,
+        "paint": true
+      }
+    },
+    {
+      "name": "retraction",
+      "type": "retraction",
+      "params": {
+        "end_offset_x": 0.020,
+        "num_frames_to_rcm": 25,
+        "num_frames_exit": 25,
+        "exit_euler": [-25.9, -43.7, 101.2],
+        "paint": false
+      }
+    }
+  ]
+}

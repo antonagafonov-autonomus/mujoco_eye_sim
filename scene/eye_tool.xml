@@ -1,7 +1,7 @@
 <mujoco>
   <!-- Surgical tool (diathermic tip) -->
   <worldbody>
-    <body name="diathermic_tip" pos="0.0374 -0.0095 0.2735" euler="-25.5 -45.5 99.5" mocap="true">
+    <body name="diathermic_tip" pos="0.0494 -0.0089 0.2735" euler="-25.9 -43.7 101.2" mocap="true">
       <!-- Visual geometry -->
       <geom name="tool_geom" type="mesh" mesh="diathermic_tip"
             material="tool_mat" contype="0" conaffinity="0"/>
