@@ -17,6 +17,12 @@ from pathlib import Path
 from datetime import datetime
 from PIL import Image
 
+try:
+    import trimesh
+    TRIMESH_AVAILABLE = True
+except ImportError:
+    TRIMESH_AVAILABLE = False
+
 
 # =============================================================================
 # TOOL OFFSET CALCULATIONS
@@ -80,14 +86,16 @@ class RCMController:
         RCM-to-tip distance = 8mm
     """
 
-    def __init__(self, rcm_world_pos):
+    def __init__(self, rcm_world_pos, tool_roll_deg=0.0):
         """
         Args:
             rcm_world_pos: [x,y,z] fixed RCM position in world coordinates
+            tool_roll_deg: rotation around shaft axis in degrees (default 0)
         """
         self.rcm_world = np.array(rcm_world_pos)
         self.rcm_local = RCM_LOCAL_OFFSET.copy()
         self.tip_local = TIP_LOCAL_OFFSET.copy()
+        self.tool_roll = np.radians(tool_roll_deg)
 
         # Vector from RCM to tip in local frame (this is what we align)
         self.rcm_to_tip_local = self.tip_local - self.rcm_local
@@ -100,6 +108,7 @@ class RCMController:
         print(f"  [RCM DEBUG] TIP_LOCAL_OFFSET: {self.tip_local}")
         print(f"  [RCM DEBUG] rcm_to_tip_local: {self.rcm_to_tip_local}")
         print(f"  [RCM DEBUG] rcm_to_tip_distance: {self.rcm_to_tip_distance*1000:.2f} mm")
+        print(f"  [RCM DEBUG] tool_roll: {tool_roll_deg:.1f} deg")
 
     def calculate_tool_pose(self, tip_world_pos):
         """
@@ -137,6 +146,13 @@ class RCMController:
             rcm_to_tip_local_norm,   # Local direction from RCM to tip
             rcm_to_tip_world_norm    # World direction from RCM to tip
         )
+
+        # 2b. Apply roll rotation around shaft axis (rcm_to_tip direction)
+        if abs(self.tool_roll) > 1e-6:
+            roll_matrix = self._axis_angle_to_rotation_matrix(
+                rcm_to_tip_world_norm, self.tool_roll
+            )
+            rotation_matrix = roll_matrix @ rotation_matrix
 
         # 3. Calculate body position
         # Tool slides through RCM - tip must be at desired position
@@ -200,6 +216,16 @@ class RCMController:
 
         R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * (K @ K)
         return R
+
+    def _axis_angle_to_rotation_matrix(self, axis, angle):
+        """Create rotation matrix from axis and angle (Rodrigues' formula)"""
+        axis = axis / np.linalg.norm(axis)
+        K = np.array([
+            [0, -axis[2], axis[1]],
+            [axis[2], 0, -axis[0]],
+            [-axis[1], axis[0], 0]
+        ])
+        return np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * (K @ K)
 
     def _rotation_matrix_to_quaternion(self, R):
         """Convert 3x3 rotation matrix to quaternion [w, x, y, z]"""
@@ -367,11 +393,20 @@ def load_obj_with_uv(obj_path):
                     if face_uv:
                         face_uvs.append([face_uv[0], face_uv[i], face_uv[i + 1]])
 
+    vertices_arr = np.array(vertices)
+    faces_arr = np.array(faces)
+
+    # Create trimesh object for fast queries
+    trimesh_obj = None
+    if TRIMESH_AVAILABLE and len(faces_arr) > 0:
+        trimesh_obj = trimesh.Trimesh(vertices=vertices_arr, faces=faces_arr)
+
     return {
-        'vertices': np.array(vertices),
-        'faces': np.array(faces),
+        'vertices': vertices_arr,
+        'faces': faces_arr,
         'uvs': np.array(uvs) if uvs else None,
-        'face_uvs': np.array(face_uvs) if face_uvs else None
+        'face_uvs': np.array(face_uvs) if face_uvs else None,
+        'trimesh': trimesh_obj
     }
 
 
@@ -452,6 +487,27 @@ def world_to_uv(point_world, mesh_data, eye_assembly_pos):
     uvs = mesh_data['uvs']
     face_uvs = mesh_data['face_uvs']
 
+    # Use trimesh for fast closest point query
+    if TRIMESH_AVAILABLE and mesh_data.get('trimesh') is not None:
+        mesh = mesh_data['trimesh']
+        closest, dist, face_idx = mesh.nearest.on_surface([point_local])
+        closest = closest[0]
+        dist = dist[0]
+        face_idx = face_idx[0]
+
+        # Get triangle vertices and UVs
+        face = faces[face_idx]
+        face_uv = face_uvs[face_idx]
+        v0, v1, v2 = vertices[face[0]], vertices[face[1]], vertices[face[2]]
+        uv0, uv1, uv2 = uvs[face_uv[0]], uvs[face_uv[1]], uvs[face_uv[2]]
+
+        # Compute barycentric coordinates for UV interpolation
+        (bu, bv, bw), _ = point_to_triangle_barycentric(closest, v0, v1, v2)
+        best_uv = bu * uv0 + bv * uv1 + bw * uv2
+
+        return best_uv, dist
+
+    # Fallback to slow method
     best_dist = float('inf')
     best_uv = None
 
@@ -811,7 +867,8 @@ def run_with_capture(model, data, trajectory_world, output_dir,
                      painter=None, paint_radius=3,
                      scene_path=None,
                      rcm_controller=None,
-                     vary_lights=False):
+                     vary_lights=False,
+                     debug=False):
     """
     Run trajectory and capture images from both cameras
     Optionally paint trajectory on lens texture
@@ -831,6 +888,7 @@ def run_with_capture(model, data, trajectory_world, output_dir,
                         If provided, tool orientation follows RCM constraint.
                         If None, tool uses fixed orientation (legacy behavior).
         vary_lights: If True, vary light intensity and position per frame
+        debug: If True, print frame idx, tool pos and euler for each frame
 
     Returns:
         Path to saved JSON log file
@@ -925,6 +983,10 @@ def run_with_capture(model, data, trajectory_world, output_dir,
             body_pos = tip_pos - tip_world_offset
             data.mocap_pos[mocap_id] = body_pos
             euler_deg = np.array([0, 0, 45])  # Default euler angles
+
+        # Debug print
+        if debug:
+            print(f"[DEBUG] Frame {idx}: pos=\"{body_pos[0]:.4f} {body_pos[1]:.4f} {body_pos[2]:.4f}\" euler=\"{euler_deg[0]:.1f} {euler_deg[1]:.1f} {euler_deg[2]:.1f}\"")
 
         # Vary lighting per frame (if enabled)
         if vary_lights:
@@ -1032,7 +1094,8 @@ def move_tool_along_trajectory(model, data, trajectory_world,
                                tool_body_name='diathermic_tip',
                                speed=1.0,
                                painter=None, paint_radius=3,
-                               rcm_controller=None):
+                               rcm_controller=None,
+                               debug=False):
     """
     Move tool along trajectory in interactive viewer
     Optionally paint trajectory on lens texture
@@ -1046,6 +1109,7 @@ def move_tool_along_trajectory(model, data, trajectory_world,
         painter: TexturePainter instance (optional)
         paint_radius: Radius in pixels for painting (default 3)
         rcm_controller: RCMController instance for tool orientation (optional)
+        debug: If True, print frame idx, tool pos and euler for each frame
     """
     # Get tool body ID
     tool_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, tool_body_name)
@@ -1094,11 +1158,19 @@ def move_tool_along_trajectory(model, data, trajectory_world,
             if rcm_controller:
                 # Use RCM controller for realistic tool orientation
                 tool_pose = rcm_controller.calculate_tool_pose(tip_pos)
-                data.mocap_pos[mocap_id] = tool_pose['body_position']
+                body_pos = tool_pose['body_position']
+                euler_deg = tool_pose['euler_deg']
+                data.mocap_pos[mocap_id] = body_pos
                 data.mocap_quat[mocap_id] = tool_pose['quaternion']
             else:
                 # Legacy behavior: fixed orientation, only translate
-                data.mocap_pos[mocap_id] = tip_pos - tip_world_offset
+                body_pos = tip_pos - tip_world_offset
+                euler_deg = np.array([0, 0, 45])
+                data.mocap_pos[mocap_id] = body_pos
+
+            # Debug print
+            if debug and frame_counter == 0:
+                print(f"[DEBUG] Frame {current_idx}: pos=\"{body_pos[0]:.4f} {body_pos[1]:.4f} {body_pos[2]:.4f}\" euler=\"{euler_deg[0]:.1f} {euler_deg[1]:.1f} {euler_deg[2]:.1f}\"")
 
             # Paint on texture if painter provided (only on new points)
             if painter and frame_counter == 0:

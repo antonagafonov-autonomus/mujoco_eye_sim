@@ -2,10 +2,18 @@
 """
 Phase 1: OBJ Parser & Lens Analysis
 Analyzes Lens_L_extracted.obj to extract geometry and calculate lens plane
+Uses trimesh for fast mesh operations.
 """
 
 import numpy as np
 from pathlib import Path
+
+try:
+    import trimesh
+    TRIMESH_AVAILABLE = True
+except ImportError:
+    TRIMESH_AVAILABLE = False
+    print("Warning: trimesh not installed. Using slow fallback. Install with: pip install trimesh")
 
 
 def parse_obj_file(obj_path):
@@ -218,6 +226,20 @@ def analyze_lens_geometry(obj_path):
     print(f"    Y-axis: {coord_frame['y_axis']}")
     print(f"    Z-axis: {coord_frame['z_axis']}")
     
+    # Create trimesh object for fast operations
+    trimesh_obj = None
+    if TRIMESH_AVAILABLE:
+        # Triangulate faces for trimesh
+        triangles = []
+        for face in obj_data['faces']:
+            if len(face) >= 3:
+                # Fan triangulation for polygons
+                for i in range(1, len(face) - 1):
+                    triangles.append([face[0], face[i], face[i + 1]])
+        triangles = np.array(triangles)
+        trimesh_obj = trimesh.Trimesh(vertices=obj_data['vertices'], faces=triangles)
+        print(f"  ✓ Trimesh object created ({len(triangles)} triangles)")
+
     # Combine all results
     lens_geometry = {
         'vertices': obj_data['vertices'],
@@ -227,9 +249,10 @@ def analyze_lens_geometry(obj_path):
         'center_local': center,
         'normal': normal,
         'bounds': bounds,
-        'coord_frame': coord_frame
+        'coord_frame': coord_frame,
+        'trimesh': trimesh_obj  # Cached trimesh object for fast operations
     }
-    
+
     return lens_geometry
 
 
@@ -444,10 +467,22 @@ def project_trajectory_to_mesh(trajectory_local, lens_geometry):
     Returns:
         Nx3 array of projected points on mesh surface
     """
+    print(f"\nProjecting {len(trajectory_local)} points onto mesh surface...")
+
+    # Use trimesh for fast vectorized projection
+    if TRIMESH_AVAILABLE and lens_geometry.get('trimesh') is not None:
+        mesh = lens_geometry['trimesh']
+        # nearest.on_surface returns (closest_points, distances, triangle_ids)
+        projected, distances, _ = mesh.nearest.on_surface(trajectory_local)
+        print(f"  ✓ Projection complete (using trimesh)")
+        print(f"  ✓ Mean projection distance: {np.mean(distances)*1000:.4f} mm")
+        print(f"  ✓ Max projection distance: {np.max(distances)*1000:.4f} mm")
+        return projected
+
+    # Fallback to slow method if trimesh not available
+    print("  Using slow fallback (trimesh not available)...")
     vertices = lens_geometry['vertices']
     faces = lens_geometry['faces']
-
-    print(f"\nProjecting {len(trajectory_local)} points onto mesh surface...")
 
     projected = []
     for i, point in enumerate(trajectory_local):

@@ -38,6 +38,45 @@ from analyze_lens import (
 def reset_texture(texture_path, color=(128, 128, 128), size=(512, 512)):
     """Reset texture to a solid color"""
     img = Image.new('RGB', size, color)
+
+
+def quaternion_to_euler_deg(quat):
+    """Convert quaternion [w,x,y,z] to euler angles in degrees"""
+    w, x, y, z = quat
+    # Roll (x-axis rotation)
+    sinr_cosp = 2 * (w * x + y * z)
+    cosr_cosp = 1 - 2 * (x * x + y * y)
+    roll = np.arctan2(sinr_cosp, cosr_cosp)
+    # Pitch (y-axis rotation)
+    sinp = 2 * (w * y - z * x)
+    if abs(sinp) >= 1:
+        pitch = np.copysign(np.pi / 2, sinp)
+    else:
+        pitch = np.arcsin(sinp)
+    # Yaw (z-axis rotation)
+    siny_cosp = 2 * (w * z + x * y)
+    cosy_cosp = 1 - 2 * (y * y + z * z)
+    yaw = np.arctan2(siny_cosp, cosy_cosp)
+    return np.degrees([roll, pitch, yaw])
+
+
+def update_tool_xml(xml_path, pos, euler_deg):
+    """Update eye_tool.xml with new tool position and orientation"""
+    import re
+    with open(xml_path, 'r') as f:
+        content = f.read()
+
+    # Update position and euler in the diathermic_tip body
+    pattern = r'(<body name="diathermic_tip" pos=")[^"]*(" euler=")[^"]*(")'
+    pos_str = f"{pos[0]:.4f} {pos[1]:.4f} {pos[2]:.4f}"
+    euler_str = f"{euler_deg[0]:.1f} {euler_deg[1]:.1f} {euler_deg[2]:.1f}"
+    replacement = rf'\g<1>{pos_str}\g<2>{euler_str}\g<3>'
+    new_content = re.sub(pattern, replacement, content)
+
+    with open(xml_path, 'w') as f:
+        f.write(new_content)
+
+    return pos_str, euler_str
     img.save(texture_path)
 
 
@@ -173,11 +212,12 @@ def run_iteration(iteration_idx, args, lens_geometry, scene_path, base_output_di
             rcm_radius=args.rcm_radius,
             rcm_height=args.rcm_height
         )
-        rcm_controller = RCMController(rcm_world)
+        rcm_controller = RCMController(rcm_world, tool_roll_deg=args.tool_roll)
         print(f"\nRCM parameters:")
         print(f"  RCM position: [{rcm_world[0]:.4f}, {rcm_world[1]:.4f}, {rcm_world[2]:.4f}]")
         print(f"  RCM radius: {args.rcm_radius*1000:.1f} mm")
         print(f"  RCM height: {args.rcm_height*1000:.1f} mm")
+        print(f"  Tool roll: {args.tool_roll:.1f} deg")
 
     # Generate ellipsoid trajectory
     trajectory_local = generate_ellipsoid_trajectory(
@@ -201,6 +241,34 @@ def run_iteration(iteration_idx, args, lens_geometry, scene_path, base_output_di
     projected_world = transform_to_world_coordinates(projected_local, args.eye_pos)
 
     print(f"✓ Generated trajectory: {len(projected_world)} points")
+
+    # Calculate and print initial tool pose (first trajectory point)
+    initial_tip_pos = projected_world[0]
+    print(f"\nInitial trajectory point (tip position):")
+    print(f"  [{initial_tip_pos[0]:.4f}, {initial_tip_pos[1]:.4f}, {initial_tip_pos[2]:.4f}]")
+
+    if rcm_controller:
+        initial_pose = rcm_controller.calculate_tool_pose(initial_tip_pos)
+        initial_body_pos = initial_pose['body_position']
+        initial_quat = initial_pose['quaternion']
+        initial_euler = quaternion_to_euler_deg(initial_quat)
+    else:
+        # Legacy: fixed orientation
+        from utils import get_tool_offset
+        initial_body_pos = initial_tip_pos - get_tool_offset()
+        initial_euler = np.array([0, 0, 45])
+
+    print(f"Initial tool body position:")
+    print(f"  [{initial_body_pos[0]:.4f}, {initial_body_pos[1]:.4f}, {initial_body_pos[2]:.4f}]")
+    print(f"Initial tool euler angles (degrees):")
+    print(f"  [{initial_euler[0]:.1f}, {initial_euler[1]:.1f}, {initial_euler[2]:.1f}]")
+
+    # Update eye_tool.xml with initial pose
+    tool_xml_path = Path(args.scene).parent / 'eye_tool.xml'
+    if tool_xml_path.exists():
+        pos_str, euler_str = update_tool_xml(tool_xml_path, initial_body_pos, initial_euler)
+        print(f"✓ Updated {tool_xml_path}:")
+        print(f"  pos=\"{pos_str}\" euler=\"{euler_str}\"")
 
     # Create iteration output directory
     iter_output_dir = base_output_dir / f"iter_{iteration_idx:04d}"
@@ -234,15 +302,26 @@ def run_iteration(iteration_idx, args, lens_geometry, scene_path, base_output_di
     data = mujoco.MjData(model)
     mujoco.mj_forward(model, data)
 
-    # Run capture
-    run_with_capture(
-        model, data, projected_world, iter_output_dir,
-        width=args.width, height=args.height,
-        painter=painter, paint_radius=args.paint_radius,
-        scene_path=scene_path,
-        rcm_controller=rcm_controller,
-        vary_lights=args.vary_lights
-    )
+    # Run viewer or capture
+    if args.viewer:
+        print("\n✓ Starting interactive viewer (no data saving)...")
+        move_tool_along_trajectory(
+            model, data, projected_world,
+            speed=args.speed,
+            painter=painter, paint_radius=args.paint_radius,
+            rcm_controller=rcm_controller,
+            debug=args.debug
+        )
+    else:
+        run_with_capture(
+            model, data, projected_world, iter_output_dir,
+            width=args.width, height=args.height,
+            painter=painter, paint_radius=args.paint_radius,
+            scene_path=scene_path,
+            rcm_controller=rcm_controller,
+            vary_lights=args.vary_lights,
+            debug=args.debug
+        )
 
     return iter_output_dir
 
@@ -281,6 +360,8 @@ def main():
                         help='Path to scene XML file')
     parser.add_argument('--capture', '-c', action='store_true',
                         help='Capture images from both cameras')
+    parser.add_argument('--viewer', '-v', action='store_true',
+                        help='View simulation interactively (no data saving)')
     parser.add_argument('--output', '-o', type=str, default='../captures',
                         help='Output directory for captured data')
     parser.add_argument('--width', type=int, default=640,
@@ -308,10 +389,16 @@ def main():
                         help='RCM distance from lens center in meters (default 5mm)')
     parser.add_argument('--rcm-height', type=float, default=0.006,
                         help='RCM height above lens surface in meters (default 6mm, tool reach is 8mm)')
+    parser.add_argument('--tool-roll', type=float, default=0.0,
+                        help='Tool roll around shaft axis in degrees (default 0)')
 
     # Lighting variation
     parser.add_argument('--vary-lights', action='store_true',
                         help='Enable per-frame lighting variation')
+
+    # Debug
+    parser.add_argument('--debug', action='store_true',
+                        help='Print frame idx, tool pos and euler for each frame')
 
     args = parser.parse_args()
 
@@ -344,10 +431,11 @@ def main():
                 rcm_radius=args.rcm_radius,
                 rcm_height=args.rcm_height
             )
-            rcm_controller = RCMController(rcm_world)
+            rcm_controller = RCMController(rcm_world, tool_roll_deg=args.tool_roll)
             print(f"  RCM position: [{rcm_world[0]:.4f}, {rcm_world[1]:.4f}, {rcm_world[2]:.4f}]")
             print(f"  RCM radius: {args.rcm_radius*1000:.1f} mm")
             print(f"  RCM height: {args.rcm_height*1000:.1f} mm")
+            print(f"  Tool roll: {args.tool_roll:.1f} deg")
 
         # Initialize painter if requested
         painter = None
@@ -381,14 +469,16 @@ def main():
                 painter=painter, paint_radius=args.paint_radius,
                 scene_path=scene_path,
                 rcm_controller=rcm_controller,
-                vary_lights=args.vary_lights
+                vary_lights=args.vary_lights,
+                debug=args.debug
             )
         else:
             move_tool_along_trajectory(
                 model, data, trajectory_world,
                 speed=args.speed,
                 painter=painter, paint_radius=args.paint_radius,
-                rcm_controller=rcm_controller
+                rcm_controller=rcm_controller,
+                debug=args.debug
             )
 
     else:

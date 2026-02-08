@@ -12,7 +12,7 @@ import os
 
 
 def find_camera_params(scene_path, camera_name='angle_view'):
-    """Parse scene XML and included files to find camera euler and fovy"""
+    """Parse scene XML and included files to find camera pos, euler and fovy"""
     scene_dir = os.path.dirname(os.path.abspath(scene_path))
 
     def search_xml(xml_path):
@@ -23,10 +23,12 @@ def find_camera_params(scene_path, camera_name='angle_view'):
             # Search for camera in this file
             for cam in root.iter('camera'):
                 if cam.get('name') == camera_name:
+                    pos_str = cam.get('pos', '0 0 0')
+                    pos = [float(x) for x in pos_str.split()]
                     euler_str = cam.get('euler', '0 0 0')
                     euler = [float(x) for x in euler_str.split()]
                     fovy = float(cam.get('fovy', '45'))
-                    return euler, fovy
+                    return pos, euler, fovy
 
             # Search in included files
             for inc in root.iter('include'):
@@ -41,13 +43,16 @@ def find_camera_params(scene_path, camera_name='angle_view'):
         return None
 
     result = search_xml(scene_path)
-    return result if result else ([0, 0, 0], 45.0)
+    return result if result else ([0, 0, 0], [0, 0, 0], 45.0)
 
 class CameraAdjuster:
-    def __init__(self, model, camera_name, initial_euler, initial_fovy):
+    def __init__(self, model, camera_name, initial_pos, initial_euler, initial_fovy):
         self.model = model
         self.camera_name = camera_name
         self.cam_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_CAMERA, camera_name)
+
+        # Track position
+        self.pos = np.array(initial_pos, dtype=float)
 
         # Track euler angles (for display only - actual rotation uses quaternion deltas)
         self.euler = np.array(initial_euler, dtype=float)
@@ -57,11 +62,13 @@ class CameraAdjuster:
         self.base_quat = self.model.cam_quat[self.cam_id].copy()
 
         self.step = 5.0  # degrees per keypress
+        self.pos_step = 0.01  # meters per keypress
         self.fovy_step = 5.0  # fovy step
         self.last_key_time = {}
         self.key_delay = 0.1
 
         print(f"Camera: {camera_name}")
+        print(f"Initial pos: {self.pos[0]:.3f} {self.pos[1]:.3f} {self.pos[2]:.3f}")
         print(f"Initial euler: {self.euler[0]:.1f} {self.euler[1]:.1f} {self.euler[2]:.1f}, fovy: {self.fovy:.1f}")
 
     def euler_to_quat_mujoco(self, euler_deg):
@@ -154,27 +161,38 @@ class CameraAdjuster:
         self.model.cam_fovy[self.cam_id] = self.fovy
         self._print_current()
 
+    def translate(self, axis, direction):
+        """Translate position on axis (0=x, 1=y, 2=z)"""
+        self.pos[axis] += direction * self.pos_step
+        self.model.cam_pos[self.cam_id] = self.pos
+        self._print_current()
+
     def _print_current(self):
         # Get actual euler from current quaternion
         euler = self.quat_to_euler_mujoco(self.model.cam_quat[self.cam_id])
-        print(f"euler=\"{euler[0]:.0f} {euler[1]:.0f} {euler[2]:.0f}\" fovy=\"{self.fovy:.0f}\"")
+        pos = self.model.cam_pos[self.cam_id]
+        print(f"pos=\"{pos[0]:.3f} {pos[1]:.3f} {pos[2]:.3f}\" euler=\"{euler[0]:.0f} {euler[1]:.0f} {euler[2]:.0f}\" fovy=\"{self.fovy:.0f}\"")
 
     def print_final(self):
         # Get actual euler from current quaternion
         euler = self.quat_to_euler_mujoco(self.model.cam_quat[self.cam_id])
+        pos = self.model.cam_pos[self.cam_id]
         print("\n" + "="*50)
         print(f"FINAL CAMERA PARAMETERS ({self.camera_name})")
         print("="*50)
-        print(f"euler=\"{euler[0]:.0f} {euler[1]:.0f} {euler[2]:.0f}\" fovy=\"{self.fovy:.0f}\"")
+        print(f"pos=\"{pos[0]:.3f} {pos[1]:.3f} {pos[2]:.3f}\" euler=\"{euler[0]:.0f} {euler[1]:.0f} {euler[2]:.0f}\" fovy=\"{self.fovy:.0f}\"")
         print("="*50)
 
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description='Adjust camera rotation and FOV')
-    parser.add_argument('--camera', '-c', type=str, default='angle_view',
+    parser = argparse.ArgumentParser(description='Adjust camera rotation, position and FOV')
+    parser.add_argument('--camera', '-c', type=str, default='top_view',
                         choices=['angle_view', 'top_view', 'tool_view'],
-                        help='Camera to adjust (default: angle_view)')
+                        help='Camera to adjust (default: top_view)')
+    parser.add_argument('--pos', type=float, nargs=3, default=None,
+                        metavar=('X', 'Y', 'Z'),
+                        help='Initial position (default: read from scene XML)')
     parser.add_argument('--euler', type=float, nargs=3, default=None,
                         metavar=('X', 'Y', 'Z'),
                         help='Initial euler angles (default: read from scene XML)')
@@ -185,21 +203,27 @@ def main():
     args = parser.parse_args()
 
     # Get initial params from XML if not specified
-    if args.euler is None or args.fovy is None:
-        euler_xml, fovy_xml = find_camera_params(args.scene, args.camera)
-        if args.euler is None:
-            args.euler = euler_xml
-        if args.fovy is None:
-            args.fovy = fovy_xml
-        print(f"Loaded from XML ({args.camera}): euler={args.euler}, fovy={args.fovy}")
+    pos_xml, euler_xml, fovy_xml = find_camera_params(args.scene, args.camera)
+    if args.pos is None:
+        args.pos = pos_xml
+    if args.euler is None:
+        args.euler = euler_xml
+    if args.fovy is None:
+        args.fovy = fovy_xml
+    print(f"Loaded from XML ({args.camera}): pos={args.pos}, euler={args.euler}, fovy={args.fovy}")
 
     print("\n" + "="*50)
-    print("CAMERA ANGLE ADJUSTER")
+    print("CAMERA ADJUSTER")
     print("="*50)
-    print("\nControls:")
+    print("\nRotation Controls:")
     print("  I/K  - Rotate X axis")
     print("  J/L  - Rotate Z axis")
     print("  U/O  - Rotate Y axis")
+    print("\nPosition Controls:")
+    print("  A/D  - Move X axis")
+    print("  W/S  - Move Y axis")
+    print("  R/E  - Move Z axis")
+    print("\nOther:")
     print("  F/V  - Increase/decrease FOV")
     print("  +/-  - Change step size")
     print("  Q    - Quit and print final values")
@@ -209,7 +233,7 @@ def main():
     data = mujoco.MjData(model)
     mujoco.mj_forward(model, data)
 
-    adjuster = CameraAdjuster(model, args.camera, args.euler, args.fovy)
+    adjuster = CameraAdjuster(model, args.camera, args.pos, args.euler, args.fovy)
     running = True
 
     def on_key(keycode):
@@ -234,18 +258,32 @@ def main():
             adjuster.rotate(1, 1)
         elif key == 'o':
             adjuster.rotate(1, -1)
+        elif key == 'a':
+            adjuster.translate(0, -1)  # X-
+        elif key == 'd':
+            adjuster.translate(0, 1)   # X+
+        elif key == 'w':
+            adjuster.translate(1, 1)   # Y+
+        elif key == 's':
+            adjuster.translate(1, -1)  # Y-
+        elif key == 'r':
+            adjuster.translate(2, 1)   # Z+
+        elif key == 'e':
+            adjuster.translate(2, -1)  # Z-
         elif key == 'f':
             adjuster.adjust_fovy(1)
         elif key == 'v':
             adjuster.adjust_fovy(-1)
         elif key == '=' or key == '+':
             adjuster.step = min(45, adjuster.step * 1.5)
+            adjuster.pos_step = min(0.1, adjuster.pos_step * 1.5)
             adjuster.fovy_step = min(20, adjuster.fovy_step * 1.5)
-            print(f"Step: {adjuster.step:.1f} deg, fovy step: {adjuster.fovy_step:.1f}")
+            print(f"Rotation step: {adjuster.step:.1f} deg, pos step: {adjuster.pos_step:.4f}m, fovy step: {adjuster.fovy_step:.1f}")
         elif key == '-':
             adjuster.step = max(1, adjuster.step / 1.5)
+            adjuster.pos_step = max(0.001, adjuster.pos_step / 1.5)
             adjuster.fovy_step = max(1, adjuster.fovy_step / 1.5)
-            print(f"Step: {adjuster.step:.1f} deg, fovy step: {adjuster.fovy_step:.1f}")
+            print(f"Rotation step: {adjuster.step:.1f} deg, pos step: {adjuster.pos_step:.4f}m, fovy step: {adjuster.fovy_step:.1f}")
 
     with mujoco.viewer.launch_passive(model, data, key_callback=on_key) as viewer:
         # Set to angle_view camera
