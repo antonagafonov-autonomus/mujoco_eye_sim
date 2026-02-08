@@ -240,7 +240,8 @@ def run_iteration(iteration_idx, args, lens_geometry, scene_path, base_output_di
         width=args.width, height=args.height,
         painter=painter, paint_radius=args.paint_radius,
         scene_path=scene_path,
-        rcm_controller=rcm_controller
+        rcm_controller=rcm_controller,
+        vary_lights=args.vary_lights
     )
 
     return iter_output_dir
@@ -307,6 +308,10 @@ def main():
                         help='RCM distance from lens center in meters (default 5mm)')
     parser.add_argument('--rcm-height', type=float, default=0.006,
                         help='RCM height above lens surface in meters (default 6mm, tool reach is 8mm)')
+
+    # Lighting variation
+    parser.add_argument('--vary-lights', action='store_true',
+                        help='Enable per-frame lighting variation')
 
     args = parser.parse_args()
 
@@ -375,7 +380,8 @@ def main():
                 width=args.width, height=args.height,
                 painter=painter, paint_radius=args.paint_radius,
                 scene_path=scene_path,
-                rcm_controller=rcm_controller
+                rcm_controller=rcm_controller,
+                vary_lights=args.vary_lights
             )
         else:
             move_tool_along_trajectory(

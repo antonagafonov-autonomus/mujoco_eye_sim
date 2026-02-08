@@ -700,7 +700,7 @@ class TexturePainter:
 
         # For bubble mode, add random variation to radius
         if self.fill_mode == self.FILL_BUBBLE:
-            radius_pixels = radius_pixels + random.randint(0, 3)
+            radius_pixels = radius_pixels + random.randint(0, 9)
 
         # Paint circle of radius k pixels
         for dy in range(-radius_pixels, radius_pixels + 1):
@@ -810,7 +810,8 @@ def run_with_capture(model, data, trajectory_world, output_dir,
                      width=640, height=480,
                      painter=None, paint_radius=3,
                      scene_path=None,
-                     rcm_controller=None):
+                     rcm_controller=None,
+                     vary_lights=False):
     """
     Run trajectory and capture images from both cameras
     Optionally paint trajectory on lens texture
@@ -829,6 +830,7 @@ def run_with_capture(model, data, trajectory_world, output_dir,
         rcm_controller: RCMController instance for tool orientation (optional)
                         If provided, tool orientation follows RCM constraint.
                         If None, tool uses fixed orientation (legacy behavior).
+        vary_lights: If True, vary light intensity and position per frame
 
     Returns:
         Path to saved JSON log file
@@ -865,6 +867,20 @@ def run_with_capture(model, data, trajectory_world, output_dir,
         painter.reset_texture()
         # Save initial clean texture to temp path
         painter.save_texture(painter.temp_texture_path)
+
+    # Store base light values for variation (if enabled)
+    base_top_diffuse = None
+    base_side_diffuse = None
+    base_top_pos = None
+    base_side_pos = None
+    if vary_lights:
+        top_light_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_LIGHT, 'top_light')
+        side_light_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_LIGHT, 'side_light')
+        base_top_diffuse = model.light_diffuse[top_light_id].copy() if top_light_id >= 0 else None
+        base_side_diffuse = model.light_diffuse[side_light_id].copy() if side_light_id >= 0 else None
+        base_top_pos = model.light_pos[top_light_id].copy() if top_light_id >= 0 else None
+        base_side_pos = model.light_pos[side_light_id].copy() if side_light_id >= 0 else None
+        print(f"  Light variation: ENABLED")
 
     # Create renderer once if not using painter (no model reload needed)
     renderer = None
@@ -909,6 +925,31 @@ def run_with_capture(model, data, trajectory_world, output_dir,
             body_pos = tip_pos - tip_world_offset
             data.mocap_pos[mocap_id] = body_pos
             euler_deg = np.array([0, 0, 45])  # Default euler angles
+
+        # Vary lighting per frame (if enabled)
+        if vary_lights:
+            top_light_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_LIGHT, 'top_light')
+            side_light_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_LIGHT, 'side_light')
+            if top_light_id >= 0 and base_top_diffuse is not None:
+                # Vary diffuse intensity (0.7 to 1.0 of base)
+                intensity = random.uniform(0.7, 1.0)
+                model.light_diffuse[top_light_id] = base_top_diffuse * intensity
+                # Vary position slightly (±0.2m)
+                model.light_pos[top_light_id] = base_top_pos + np.array([
+                    random.uniform(-0.2, 0.2),
+                    random.uniform(-0.2, 0.2),
+                    random.uniform(-0.1, 0.1)
+                ])
+            if side_light_id >= 0 and base_side_diffuse is not None:
+                # Vary diffuse intensity (0.5 to 1.0 of base)
+                intensity = random.uniform(0.5, 1.0)
+                model.light_diffuse[side_light_id] = base_side_diffuse * intensity
+                # Vary position slightly (±0.3m)
+                model.light_pos[side_light_id] = base_side_pos + np.array([
+                    random.uniform(-0.3, 0.3),
+                    random.uniform(-0.3, 0.3),
+                    random.uniform(-0.1, 0.1)
+                ])
 
         # Compute forward kinematics (no physics simulation)
         mujoco.mj_forward(model, data)

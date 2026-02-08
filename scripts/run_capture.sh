@@ -17,7 +17,7 @@ RADIUS_STD=0.0002    # 0.2mm std for radius variation
 CENTER_STD=0.0002    # 0.3mm std for center offset - keeps ellipse centered
 
 # Trajectory points
-NUM_POINTS=60
+NUM_POINTS=300
 
 # Capture settings
 CAPTURE=true         # Enable/disable image capture
@@ -32,6 +32,9 @@ PAINT_RADIUS=3       # Pixels on UV texture
 RCM=true             # Enable/disable RCM constraint for tool orientation
 RCM_RADIUS=0.005     # 5mm distance from lens center to RCM
 RCM_HEIGHT=0.004     # 6mm height above lens (tool reach is 8mm)
+
+# Lighting variation
+VARY_LIGHTS=true     # Enable/disable per-frame lighting variation
 
 # =============================================================================
 # BUILD COMMAND
@@ -54,6 +57,10 @@ if [ "$RCM" = true ]; then
     CMD="$CMD --rcm --rcm-radius $RCM_RADIUS --rcm-height $RCM_HEIGHT"
 fi
 
+if [ "$VARY_LIGHTS" = true ]; then
+    CMD="$CMD --vary-lights"
+fi
+
 # =============================================================================
 # RUN
 # =============================================================================
@@ -69,6 +76,7 @@ echo "Points: $NUM_POINTS"
 echo "Capture: $CAPTURE (${WIDTH}x${HEIGHT})"
 echo "Paint: $PAINT (radius=${PAINT_RADIUS}px)"
 echo "RCM: $RCM (radius=${RCM_RADIUS}m, height=${RCM_HEIGHT}m)"
+echo "Vary lights: $VARY_LIGHTS"
 echo "============================================"
 echo "Command: $CMD"
 echo "============================================"
