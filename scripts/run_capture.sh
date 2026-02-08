@@ -20,8 +20,8 @@ CENTER_STD=0.0002    # 0.3mm std for center offset - keeps ellipse centered
 NUM_POINTS=300
 
 # Capture settings
-CAPTURE=true         # Enable/disable image capture (set false if using VIEWER)
-VIEWER=false        # Enable interactive viewer (no data saving, overrides CAPTURE)
+CAPTURE=false         # Enable/disable image capture (set false if using VIEWER)
+VIEWER=true       # Enable interactive viewer (no data saving, overrides CAPTURE)
 SPEED=1.0            # Animation speed for viewer mode
 WIDTH=640
 HEIGHT=480
